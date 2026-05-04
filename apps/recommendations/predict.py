@@ -25,18 +25,37 @@ def _load_model():
 def get_recommendations(user_id: int, top_k: int = 10, exclude_seen: bool = True) -> list[int]:
     """
     Retourne une liste d'article_ids recommandés pour un utilisateur.
-    Fallback : articles populaires si l'utilisateur n'est pas dans le modèle.
+    Stratégies adaptées selon le profil de l'utilisateur.
     """
+    from apps.users.models import UserProfile
+    from apps.blog.models import Article
+    from apps.interactions.models import Like, SavedArticle, ArticleView
+    
     model = _load_model()
-
+    
+    # Vérifier si l'utilisateur est nouveau (pas d'interactions)
+    user_interactions = ArticleView.objects.filter(user_id=user_id).count() + \
+                        Like.objects.filter(user_id=user_id).count() + \
+                        SavedArticle.objects.filter(user_id=user_id).count()
+    
+    is_new_user = user_interactions == 0
+    
+    if is_new_user:
+        # Pour les nouveaux utilisateurs : basé sur les préférences de catégories
+        logger.info(f"Nouvel utilisateur {user_id} - recommandations basées sur les préférences")
+        return _recommendations_for_new_user(user_id, top_k, exclude_seen)
+    
+    # Pour les utilisateurs existants
     if model is None:
         logger.warning("Modèle non entraîné. Fallback popularité.")
-        return _fallback_popular(top_k)
+        return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
 
     user_idx = model["user_idx"]
     if user_id not in user_idx:
-        return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
+        logger.info(f"Utilisateur {user_id} pas dans le modèle - fallback avec préférences")
+        return _recommendations_for_new_user(user_id, top_k, exclude_seen)
 
+    # Utiliser le modèle ML entraîné
     i = user_idx[user_id]
     user_vec = model["user_factors"][i]
     scores = model["article_factors"] @ user_vec
@@ -66,6 +85,39 @@ def _fallback_popular(top_k: int, user_id: int | None = None) -> list[int]:
         seen = ArticleView.objects.filter(user_id=user_id).values_list("article_id", flat=True)
         qs = qs.exclude(id__in=seen)
     return list(qs.values_list("id", flat=True)[:top_k])
+
+
+def _recommendations_for_new_user(user_id: int, top_k: int, exclude_seen: bool) -> list[int]:
+    """
+    Recommandations pour les nouveaux utilisateurs basées sur leurs préférences de catégories.
+    """
+    from apps.users.models import UserProfile
+    from apps.blog.models import Article
+    
+    try:
+        profile = UserProfile.objects.get(user_id=user_id)
+        preferred_categories = profile.preferred_categories.all()
+        
+        if not preferred_categories:
+            # Pas de préférences définies, fallback vers articles populaires
+            return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
+        
+        # Articles dans les catégories préférées, triés par popularité
+        queryset = Article.objects.filter(
+            status='published',
+            category__in=preferred_categories
+        ).annotate(
+            popularity_score=F('view_count') + Count('likes') * 3 + Count('saves') * 2
+        ).order_by('-popularity_score', '-published_at')
+        
+        if exclude_seen:
+            seen = _get_seen_article_ids(user_id)
+            queryset = queryset.exclude(id__in=seen)
+        
+        return list(queryset.values_list('id', flat=True)[:top_k])
+        
+    except UserProfile.DoesNotExist:
+        return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
 
 
 def _get_seen_article_ids(user_id: int) -> set:

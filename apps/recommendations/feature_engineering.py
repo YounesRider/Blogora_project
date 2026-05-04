@@ -17,20 +17,35 @@ from datetime import timedelta
 
 def build_user_article_matrix() -> pd.DataFrame:
     """
-    Construit la matrice user×article avec un score d'interaction implicite.
-    Score = likes*3 + saves*2 + views*1 + (reading_duration/60)*0.5
+    Construit la matrice utilisateur×article pour l'entraînement du modèle.
+    
+    Méthodologie des scores d'interaction implicite :
+    - Like : poids 3 (engagement fort)
+    - Sauvegarde : poids 2 (intérêt marqué)
+    - Vue simple : poids 1 (engagement faible)
+    - Durée de lecture : bonus 0.5 par minute (engagement profond)
+    
+    Cette approche permet de capturer les préférences implicites
+    sans nécessiter de notations explicites des utilisateurs.
+    
+    Returns:
+        DataFrame avec colonnes [user_id, article_id, score]
     """
     from apps.interactions.models import Like, SavedArticle, ArticleView
 
     records = []
 
+    # Collecte des likes (interaction la plus forte)
     for like in Like.objects.select_related("user", "article"):
         records.append({"user_id": like.user_id, "article_id": like.article_id, "value": 3})
 
+    # Collecte des sauvegardes (intérêt moyen)
     for save in SavedArticle.objects.select_related("user", "article"):
         records.append({"user_id": save.user_id, "article_id": save.article_id, "value": 2})
 
+    # Collecte des vues avec bonus de durée de lecture
     for view in ArticleView.objects.filter(user__isnull=False).select_related("user", "article"):
+        # Bonus de 0.5 par minute de lecture pour récompenser l'engagement
         reading_bonus = view.reading_duration / 60 * 0.5
         records.append({
             "user_id": view.user_id,
@@ -41,6 +56,7 @@ def build_user_article_matrix() -> pd.DataFrame:
     if not records:
         return pd.DataFrame(columns=["user_id", "article_id", "score"])
 
+    # Agrégation des interactions multiples pour le même utilisateur/article
     df = pd.DataFrame(records)
     df = df.groupby(["user_id", "article_id"], as_index=False)["value"].sum()
     df = df.rename(columns={"value": "score"})
@@ -48,7 +64,17 @@ def build_user_article_matrix() -> pd.DataFrame:
 
 
 def compute_article_features() -> pd.DataFrame:
-    """Retourne un DataFrame avec les features par article."""
+    """
+    Calcule les features des articles pour le système de recommandation.
+    
+    Features calculées :
+    - Fraîcheur : score exponentiel décroissant basé sur l'âge
+    - Popularité : basée sur les interactions (likes, saves, vues)
+    - Métadonnées : catégorie, tags, temps de lecture
+    
+    Returns:
+        DataFrame avec les features de chaque article
+    """
     from apps.blog.models import Article
 
     now = timezone.now()
@@ -56,6 +82,7 @@ def compute_article_features() -> pd.DataFrame:
 
     rows = []
     for art in articles:
+        # Calcul de la fraîcheur (décroissance exponentielle sur 30 jours)
         age_days = (now - (art.published_at or art.created_at)).days
         freshness = np.exp(-age_days / 30)  # décroit exponentiellement sur 30j
 
@@ -79,21 +106,52 @@ def compute_article_features() -> pd.DataFrame:
 def compute_user_category_affinity(user_id: int) -> dict:
     """
     Retourne un dict {category_id: affinity_score} pour un utilisateur.
-    Affinity = somme des scores d'interaction pour les articles de cette catégorie.
+    Affinity = somme pondérée des interactions pour les articles de cette catégorie.
     """
-    from apps.interactions.models import ArticleView
+    from apps.interactions.models import ArticleView, Like, SavedArticle
+    from apps.comments.models import Comment
     from apps.blog.models import Article
 
-    viewed = (
-        ArticleView.objects
-        .filter(user_id=user_id)
-        .select_related("article__category")
-    )
-
     affinity: dict[int, float] = {}
+    
+    # Pondérations pour différents types d'interactions
+    weights = {
+        'view': 1.0,
+        'like': 3.0,
+        'save': 2.0,
+        'comment': 4.0,  # Les commentaires sont très indicateurs d'intérêt
+        'reading_time': 0.1  # Bonus par minute de lecture
+    }
+    
+    # Vues avec durée de lecture
+    viewed = ArticleView.objects.filter(user_id=user_id).select_related("article__category")
     for v in viewed:
         cat = v.article.category_id
         if cat:
-            affinity[cat] = affinity.get(cat, 0) + 1 + v.reading_duration / 60 * 0.2
-
+            base_score = weights['view'] + (v.reading_duration * weights['reading_time'])
+            affinity[cat] = affinity.get(cat, 0) + base_score
+    
+    # Likes
+    liked = Like.objects.filter(user_id=user_id).select_related("article__category")
+    for like in liked:
+        cat = like.article.category_id
+        if cat:
+            affinity[cat] = affinity.get(cat, 0) + weights['like']
+    
+    # Sauvegardes
+    saved = SavedArticle.objects.filter(user_id=user_id).select_related("article__category")
+    for save in saved:
+        cat = save.article.category_id
+        if cat:
+            affinity[cat] = affinity.get(cat, 0) + weights['save']
+    
+    # Commentaires (très fort indicateur d'engagement)
+    commented = Comment.objects.filter(author_id=user_id).select_related("article__category")
+    for comment in commented:
+        cat = comment.article.category_id
+        if cat:
+            # Bonus pour les réponses (engagement plus profond)
+            comment_weight = weights['comment'] * (1.5 if comment.parent else 1.0)
+            affinity[cat] = affinity.get(cat, 0) + comment_weight
+    
     return affinity

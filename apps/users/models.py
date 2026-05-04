@@ -34,6 +34,7 @@ class UserProfile(TimeStampedModel):
     Contient les préférences qui alimentent le moteur de recommandation.
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    bio = models.TextField(blank=True, help_text="Décrivez-vous en quelques mots...")
     website = models.URLField(blank=True)
     twitter = models.CharField(max_length=50, blank=True)
     github = models.CharField(max_length=50, blank=True)

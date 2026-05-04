@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Créer un article - Smart Blog AI{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="bi bi-pencil-square"></i> 
+                        Créer un nouvel article
+                    </h3>
+                    <p class="mb-0 mt-2 opacity-75">
+                        Partagez vos connaissances avec la communauté Smart Blog AI
+                    </p>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="article-form">
+                        {% csrf_token %}
+                        
+                        <!-- Titre -->
+                        <div class="mb-4">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-type"></i> Titre de l'article
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.title.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Choisissez un titre clair et accrocheur (minimum 5 caractères)</small>
+                        </div>
+
+                        <!-- Résumé -->
+                        <div class="mb-4">
+                            <label for="{{ form.excerpt.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-text-paragraph"></i> Résumé
+                            </label>
+                            {{ form.excerpt }}
+                            {% if form.excerpt.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.excerpt.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Un bref résumé qui apparaîtra dans les listes d'articles (minimum 10 caractères)</small>
+                        </div>
+
+                        <!-- Catégorie -->
+                        <div class="mb-4">
+                            <label for="{{ form.category.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-folder"></i> Catégorie
+                            </label>
+                            {{ form.category }}
+                            {% if form.category.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.category.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Choisissez la catégorie la plus appropriée pour votre article</small>
+                        </div>
+
+                        <!-- Tags -->
+                        <div class="mb-4">
+                            <label for="{{ form.tags.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-tags"></i> Tags
+                            </label>
+                            {{ form.tags }}
+                            {% if form.tags.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.tags.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Sélectionnez plusieurs tags pour améliorer la découvrabilité (Ctrl+Clic pour multiple sélection)</small>
+                        </div>
+
+                        <!-- Image principale -->
+                        <div class="mb-4">
+                            <label for="{{ form.featured_image.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-image"></i> Image principale
+                            </label>
+                            {{ form.featured_image }}
+                            {% if form.featured_image.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.featured_image.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Une image attrayante pour illustrer votre article (optionnel)</small>
+                            <div id="image-preview" class="mt-2"></div>
+                        </div>
+
+                        <!-- Contenu -->
+                        <div class="mb-4">
+                            <label for="{{ form.content.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-file-text"></i> Contenu de l'article
+                            </label>
+                            {{ form.content }}
+                            {% if form.content.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.content.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Rédigez le contenu complet de votre article (minimum 50 caractères)</small>
+                            
+                            <!-- Aide Markdown -->
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="bi bi-info-circle"></i> Formatage du texte</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <code>**texte**</code> → <strong>gras</strong><br>
+                                        <code>*texte*</code> → <em>italique</em><br>
+                                        <code># Titre</code> → <h1>Titre</h1>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <code>[texte](url)</code> → lien<br>
+                                        <code>`code`</code> → <code>code</code><br>
+                                        <code>- liste</code> → liste à puces
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statut -->
+                        <div class="mb-4">
+                            <label for="{{ form.status.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-eye"></i> Statut de publication
+                            </label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.status.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">
+                                <strong>Brouillon</strong> : Enregistrez sans publier<br>
+                                <strong>Publié</strong> : Visible immédiatement par tous
+                            </small>
+                        </div>
+
+                        <!-- Boutons d'action -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'blog:my_articles' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Annuler
+                            </a>
+                            <div>
+                                <button type="submit" name="save_draft" class="btn btn-outline-primary me-2">
+                                    <i class="bi bi-file-earmark"></i> Enregistrer brouillon
+                                </button>
+                                <button type="submit" name="publish" class="btn btn-primary">
+                                    <i class="bi bi-send"></i> Publier l'article
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: 15px;
+    }
+    
+    .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    
+    #image-preview {
+        max-width: 300px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    #image-preview img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    
+    .alert-info {
+        background-color: #f8f9ff;
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Prévisualisation de l'image
+    const imageInput = document.getElementById('{{ form.featured_image.id_for_label }}');
+    const imagePreview = document.getElementById('image-preview');
+    
+    if (imageInput && imagePreview) {
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.innerHTML = `<img src="${e.target.result}" alt="Prévisualisation">`;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                imagePreview.innerHTML = '';
+            }
+        });
+    }
+    
+    // Gestion des boutons de soumission
+    const form = document.getElementById('article-form');
+    const statusField = document.getElementById('{{ form.status.id_for_label }}');
+    
+    // Bouton "Enregistrer brouillon"
+    const saveDraftBtn = document.querySelector('button[name="save_draft"]');
+    if (saveDraftBtn) {
+        saveDraftBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            statusField.value = 'draft';
+            form.submit();
+        });
+    }
+    
+    // Bouton "Publier"
+    const publishBtn = document.querySelector('button[name="publish"]');
+    if (publishBtn) {
+        publishBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            statusField.value = 'published';
+            form.submit();
+        });
+    }
+    
+    // Compteur de caractères pour le titre
+    const titleField = document.getElementById('{{ form.title.id_for_label }}');
+    const titleMaxLength = 200;
+    
+    if (titleField) {
+        const titleCounter = document.createElement('small');
+        titleCounter.className = 'text-muted float-end';
+        titleField.parentNode.appendChild(titleCounter);
+        
+        function updateTitleCounter() {
+            const remaining = titleMaxLength - titleField.value.length;
+            titleCounter.textContent = `${titleField.value.length}/${titleMaxLength} caractères`;
+            titleCounter.className = remaining < 20 ? 'text-danger float-end' : 'text-muted float-end';
+        }
+        
+        titleField.addEventListener('input', updateTitleCounter);
+        updateTitleCounter();
+    }
+    
+    // Compteur de caractères pour le résumé
+    const excerptField = document.getElementById('{{ form.excerpt.id_for_label }}');
+    const excerptMaxLength = 300;
+    
+    if (excerptField) {
+        const excerptCounter = document.createElement('small');
+        excerptCounter.className = 'text-muted float-end';
+        excerptField.parentNode.appendChild(excerptCounter);
+        
+        function updateExcerptCounter() {
+            const remaining = excerptMaxLength - excerptField.value.length;
+            excerptCounter.textContent = `${excerptField.value.length}/${excerptMaxLength} caractères`;
+            excerptCounter.className = remaining < 30 ? 'text-danger float-end' : 'text-muted float-end';
+        }
+        
+        excerptField.addEventListener('input', updateExcerptCounter);
+        updateExcerptCounter();
+    }
+    
+    // Auto-sauvegarde du brouillon toutes les 30 secondes
+    let autoSaveTimer;
+    
+    function startAutoSave() {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() {
+            const formData = new FormData(form);
+            formData.set('status', 'draft');
+            
+            fetch('{% url "blog:create" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Brouillon sauvegardé automatiquement');
+                }
+            }).catch(error => {
+                console.error('Erreur lors de la sauvegarde automatique:', error);
+            });
+        }, 30000); // 30 secondes
+    }
+    
+    // Démarrer l'auto-sauvegarde lors de la modification
+    form.addEventListener('input', startAutoSave);
+});
+</script>
+{% endblock %}

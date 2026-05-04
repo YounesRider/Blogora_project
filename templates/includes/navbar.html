@@ -1,0 +1,66 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <i class="bi bi-robot"></i> Smart Blog AI
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Accueil</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/articles/">Articles</a>
+                </li>
+                {% if user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'users:profile' %}">Profil</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'blog:my_articles' %}">Mes articles</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'blog:create' %}">Écrire</a>
+                </li>
+                {% endif %}
+            </ul>
+
+            <form class="d-flex me-3" method="GET" action="/articles/">
+                <input class="form-control" type="search" name="q" placeholder="Rechercher..."
+                    value="{{ request.GET.q }}">
+                <button class="btn btn-outline-light ms-2" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+            </form>
+
+            <ul class="navbar-nav">
+                {% if user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> {{ user.email }}
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'users:profile' %}">Profil</a></li>
+                        <li><a class="dropdown-item" href="{% url 'users:edit_profile' %}">Modifier le profil</a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item" href="{% url 'account_logout' %}">Déconnexion</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'account_login' %}">Connexion</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'account_signup' %}">Inscription</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
