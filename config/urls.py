@@ -3,17 +3,24 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from apps.users.views import signup_view
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-
-    # Auth (allauth)
+    # Blog
+    path("", include("apps.blog.urls")),
+    
+    # Users - Notre vue d'inscription personnalisée d'abord
+    path("account/signup/", signup_view, name="account_signup"),
     path("accounts/", include("allauth.urls")),
-
-    # Apps
-    path("", include("apps.blog.urls", namespace="blog")),
-    path("users/", include("apps.users.urls", namespace="users")),
+    path("users/", include("apps.users.urls")),
+    
+    # Comments
+    path("comments/", include("apps.comments.urls")),
+    
+    # Interactions
+    path("interactions/", include("apps.interactions.urls")),
     path("dashboard/", include("apps.dashboard.urls", namespace="dashboard")),
+    path("comments/", include("apps.comments.urls", namespace="comments")),
 
     # API v1
     path("api/v1/", include("apps.api.urls", namespace="api")),

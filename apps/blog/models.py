@@ -1,3 +1,10 @@
+"""
+Modèles de l'application Blog.
+
+Ce module contient les modèles principaux pour la gestion des articles de blog,
+incluant les fonctionnalités de publication, les métadonnées SEO,
+et les statistiques d'engagement.
+"""
 from django.db import models
 from django.utils.text import slugify
 from django.urls import reverse
@@ -5,7 +12,20 @@ from apps.core.models import PublishableModel
 
 
 class Article(PublishableModel):
-    """Article de blog principal."""
+    """
+    Modèle principal pour les articles de blog.
+    
+    Hérite de PublishableModel qui fournit :
+    - status (draft/published)
+    - created_at/updated_at
+    - published_at
+    
+    Fonctionnalités principales :
+    - Gestion automatique des slugs
+    - Métadonnées SEO intégrées
+    - Statistiques de lecture
+    - Relations avec taxonomie et interactions
+    """
 
     author = models.ForeignKey(
         "users.User",
@@ -53,19 +73,30 @@ class Article(PublishableModel):
         ]
 
     def save(self, *args, **kwargs):
+        """
+        Surcharge de la méthode save pour automatiser plusieurs traitements :
+        
+        1. Génération automatique du slug unique à partir du titre
+        2. Calcul du temps de lecture estimé (basé sur 200 mots/minute)
+        3. Génération automatique de l'extrait si non fourni
+        
+        Le slug est généré une seule fois lors de la création,
+        puis reste inchangé pour préserver les URLs.
+        """
         if not self.slug:
             base_slug = slugify(self.title)
             self.slug = base_slug
-            # Garantir l'unicité
+            # Garantir l'unicité du slug en ajoutant un suffixe numérique si nécessaire
             n = 1
             while Article.objects.filter(slug=self.slug).exclude(pk=self.pk).exists():
                 self.slug = f"{base_slug}-{n}"
                 n += 1
 
-        # Calcul approximatif du temps de lecture (200 mots/min)
+        # Calcul du temps de lecture (200 mots/min, minimum 1 minute)
         word_count = len(self.body.split())
         self.read_time = max(1, round(word_count / 200))
 
+        # Génération automatique de l'extrait (50 premiers mots)
         if not self.excerpt and self.body:
             self.excerpt = " ".join(self.body.split()[:50]) + "…"
 

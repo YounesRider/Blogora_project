@@ -1,7 +1,60 @@
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
 from apps.core.models import TimeStampedModel
+
+
+class Reaction(TimeStampedModel):
+    """Réactions avec emojis sur les articles."""
+    
+    class ReactionType(models.TextChoices):
+        LOVE = 'love', '❤️ Love'
+        LIKE = 'like', '👍 Like'
+        LAUGH = 'laugh', '😂 Laugh'
+        WOW = 'wow', '😮 Wow'
+        SAD = 'sad', '😢 Sad'
+        ANGRY = 'angry', '😠 Angry'
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reactions',
+        verbose_name='Utilisateur'
+    )
+    article = models.ForeignKey(
+        "blog.Article",
+        on_delete=models.CASCADE,
+        related_name='reactions',
+        verbose_name='Article'
+    )
+    reaction_type = models.CharField(
+        max_length=20,
+        choices=ReactionType.choices,
+        verbose_name='Type de réaction'
+    )
+    
+    class Meta:
+        verbose_name = 'Réaction'
+        verbose_name_plural = 'Réactions'
+        unique_together = ['user', 'article', 'reaction_type']
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.get_reaction_type_display()} - {self.article.title}"
+    
+    @property
+    def emoji(self):
+        """Retourne l'emoji correspondant au type de réaction."""
+        emoji_map = {
+            'love': '❤️',
+            'like': '👍',
+            'laugh': '😂',
+            'wow': '😮',
+            'sad': '😢',
+            'angry': '😠',
+        }
+        return emoji_map.get(self.reaction_type, '👍')
 
 
 class Like(TimeStampedModel):

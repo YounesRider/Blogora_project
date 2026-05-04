@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inscription - Smart Blog AI{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h3 class="mb-0">
+                    <i class="bi bi-robot"></i> Rejoindre Smart Blog AI
+                </h3>
+                <p class="mb-0 mt-2">Créez votre compte et recevez des recommandations personnalisées</p>
+            </div>
+            <div class="card-body">
+                <form method="post" id="signup-form">
+                    {% csrf_token %}
+
+                    <!-- Étape 1: Informations de base -->
+                    <div id="step1" class="signup-step">
+                        <h5 class="mb-4">
+                            <span class="badge bg-primary">1</span> Informations personnelles
+                        </h5>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_username" class="form-label">Nom d'utilisateur</label>
+                                <input type="text" class="form-control" id="id_username" name="username" required>
+                                {% if form.username.errors %}
+                                <div class="text-danger small">{{ form.username.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="id_email" name="email" required>
+                                {% if form.email.errors %}
+                                <div class="text-danger small">{{ form.email.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_password1" class="form-label">Mot de passe</label>
+                                <input type="password" class="form-control" id="id_password1" name="password1" required>
+                                {% if form.password1.errors %}
+                                <div class="text-danger small">{{ form.password1.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="id_password2" class="form-label">Confirmer le mot de passe</label>
+                                <input type="password" class="form-control" id="id_password2" name="password2" required>
+                                {% if form.password2.errors %}
+                                <div class="text-danger small">{{ form.password2.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">Prénom</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Nom</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">Bio (optionnel)</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="2"
+                                placeholder="Parlez-nous un peu de vous..."></textarea>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-primary" onclick="nextStep()">
+                                Suivant <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Étape 2: Préférences de contenu -->
+                    <div id="step2" class="signup-step" style="display: none;">
+                        <h5 class="mb-4">
+                            <span class="badge bg-primary">2</span> Vos centres d'intérêt
+                        </h5>
+                        <p class="text-muted mb-4">
+                            Sélectionnez les catégories qui vous intéressent. Notre IA vous recommandera les meilleurs
+                            articles
+                            dans ces domaines.
+                        </p>
+
+                        <div class="row">
+                            <!-- Debug: {{ categories|length }} catégories trouvées -->
+                            {% for category in categories %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card category-card h-100" data-category="{{ category.id }}">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="preferred_categories"
+                                                value="{{ category.id }}" id="cat_{{ category.id }}">
+                                            <label class="form-check-label w-100" for="cat_{{ category.id }}">
+                                                <h6 class="mb-1">{{ category.name }}</h6>
+                                                <small class="text-muted">{{ category.description|truncatewords:10
+                                                    }}</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <p class="text-muted">Aucune catégorie disponible pour le moment.</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Conseil :</strong> Sélectionnez au moins 3 catégories pour de meilleures
+                            recommandations.
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" onclick="previousStep()">
+                                <i class="bi bi-arrow-left"></i> Précédent
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="validateAndSubmit()">
+                                <i class="bi bi-check-circle"></i> Créer mon compte
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <p>Vous avez déjà un compte ?
+                <a href="{% url 'account_login' %}" class="text-decoration-none">Connectez-vous</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .category-card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .category-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-card.selected {
+        border-color: #0d6efd;
+        background-color: #f8f9ff;
+    }
+
+    .form-check-input:checked~.form-check-label h6 {
+        color: #0d6efd;
+        font-weight: 600;
+    }
+
+    .signup-step {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+</style>
+
+<script>
+    function nextStep() {
+        // Valider l'étape 1
+        const username = document.getElementById('id_username').value;
+        const email = document.getElementById('id_email').value;
+        const password1 = document.getElementById('id_password1').value;
+        const password2 = document.getElementById('id_password2').value;
+        const firstName = document.getElementById('first_name').value;
+        const lastName = document.getElementById('last_name').value;
+
+        if (!username || !email || !password1 || !password2 || !firstName || !lastName) {
+            alert('Veuillez remplir tous les champs obligatoires.');
+            return;
+        }
+
+        if (password1 !== password2) {
+            alert('Les mots de passe ne correspondent pas.');
+            return;
+        }
+
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('step2').style.display = 'block';
+    }
+
+    function previousStep() {
+        document.getElementById('step2').style.display = 'none';
+        document.getElementById('step1').style.display = 'block';
+    }
+
+    function validateAndSubmit() {
+        const selectedCategories = document.querySelectorAll('input[name="preferred_categories"]:checked');
+
+        if (selectedCategories.length === 0) {
+            alert('Veuillez sélectionner au moins une catégorie.');
+            return;
+        }
+
+        if (selectedCategories.length < 3) {
+            const confirm = confirm('Nous recommandons de sélectionner au moins 3 catégories pour de meilleures recommandations. Voulez-vous continuer ?');
+            if (!confirm) return;
+        }
+
+        // Soumettre le formulaire
+        document.getElementById('signup-form').submit();
+    }
+
+    // Gestion du clic sur les cartes de catégories
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.addEventListener('click', function (e) {
+            if (e.target.type !== 'checkbox') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                updateCardSelection(this);
+            }
+        });
+
+        // Mettre à jour le style quand la case change
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', function () {
+            updateCardSelection(card);
+        });
+    });
+
+    function updateCardSelection(card) {
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        if (checkbox.checked) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    }
+</script>
+{% endblock %}
