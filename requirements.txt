@@ -6,6 +6,7 @@ gunicorn==21.2.0
 
 # Database
 psycopg2-binary==2.9.11
+PyMySQL==1.1.0
 
 # Authentication
 django-allauth==0.61.1

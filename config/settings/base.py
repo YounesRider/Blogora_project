@@ -4,6 +4,10 @@ Base settings partagées par dev et prod.
 from pathlib import Path
 import environ
 
+# Configuration pour utiliser PyMySQL avec MySQL
+import pymysql
+pymysql.install_as_MySQLdb()
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env(DEBUG=(bool, False))
@@ -91,8 +95,20 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ─── Database ────────────────────────────────────────────────────────────────
+# Configuration pour MySQL avec XAMPP (utilise PyMySQL pour éviter les dépendances système)
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="sqlite:///db.sqlite3")
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "blogora",
+        "USER": "root",
+        "PASSWORD": "",
+        "HOST": "localhost",
+        "PORT": "3306",
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
