@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block title %}Comment Thread - {{ article.title }} - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Article Link -->
+            <div class="mb-4">
+                <a href="{{ article.get_absolute_url }}" class="text-decoration-none">
+                    <i class="bi bi-arrow-left"></i> Back to Article
+                </a>
+            </div>
+
+            <!-- Article Info -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5>{{ article.title }}</h5>
+                    <small class="text-muted">
+                        By {{ article.author.get_full_name|default:article.author.username }}
+                        • {{ article.created_at|date:"M d, Y" }}
+                    </small>
+                </div>
+            </div>
+
+            <!-- Comment Thread -->
+            <h4 class="mb-4">Comment Thread</h4>
+
+            <!-- Main Comment -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <img src="{{ comment.author.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                             class="rounded-circle me-3" width="50" height="50" alt="{{ comment.author.username }}">
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="mb-0">{{ comment.author.get_full_name|default:comment.author.username }}</h6>
+                                    <small class="text-muted">{{ comment.created_at|date:"M d, Y H:i" }}</small>
+                                </div>
+                            </div>
+                            <p class="mb-3">{{ comment.content }}</p>
+                            
+                            <div class="d-flex gap-3 align-items-center">
+                                <button class="btn btn-sm btn-outline-danger" type="button"
+                                        id="comment-like-{{ comment.id }}"
+                                        onclick="toggleCommentLike({{ comment.id }})">
+                                    <i class="bi bi-heart{% if comment|user_liked_comment:user %}-fill{% endif %}"></i>
+                                    <span class="ms-1" id="comment-likes-{{ comment.id }}">{{ comment.likes_count }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Replies -->
+            {% if comment.replies.all %}
+            <h5 class="mb-3">Replies ({{ comment.replies.count }})</h5>
+            
+            {% for reply in comment.replies.all %}
+            <div class="card mb-3 ms-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <img src="{{ reply.author.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                             class="rounded-circle me-3" width="40" height="40" alt="{{ reply.author.username }}">
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="mb-0 small">{{ reply.author.get_full_name|default:reply.author.username }}</h6>
+                                    <small class="text-muted">{{ reply.created_at|date:"M d, Y H:i" }}</small>
+                                </div>
+                            </div>
+                            <p class="mb-2 small">{{ reply.content }}</p>
+                            
+                            <div class="d-flex gap-2 align-items-center">
+                                <button class="btn btn-sm btn-outline-danger" type="button"
+                                        id="comment-like-{{ reply.id }}"
+                                        onclick="toggleCommentLike({{ reply.id }})">
+                                    <i class="bi bi-heart{% if reply|user_liked_comment:user %}-fill{% endif %}"></i>
+                                    <span class="ms-1" id="comment-likes-{{ reply.id }}">{{ reply.likes_count }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="alert alert-info">
+                No replies to this comment yet.
+            </div>
+            {% endif %}
+
+            <!-- Reply Form -->
+            {% if user.is_authenticated %}
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6 class="card-title">Reply to this comment</h6>
+                    <form method="post" action="{% url 'comments:create_comment' article.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                        <div class="mb-3">
+                            <textarea name="content" class="form-control" rows="3" 
+                                      placeholder="Your reply..." required minlength="1"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Reply
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

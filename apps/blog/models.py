@@ -8,67 +8,78 @@ et les statistiques d'engagement.
 from django.db import models
 from django.utils.text import slugify
 from django.urls import reverse
-from apps.core.models import PublishableModel
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from apps.core.models import TimeStampedModel
 
 
-class Article(PublishableModel):
+class Article(TimeStampedModel):
     """
     Modèle principal pour les articles de blog.
     
-    Hérite de PublishableModel qui fournit :
-    - status (draft/published)
-    - created_at/updated_at
-    - published_at
-    
-    Fonctionnalités principales :
-    - Gestion automatique des slugs
-    - Métadonnées SEO intégrées
-    - Statistiques de lecture
-    - Relations avec taxonomie et interactions
+    Aligné avec le diagramme UML du cahier des charges.
     """
+    
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        PENDING_REVIEW = 'pending_review', 'Pending Review'
+        PUBLISHED = 'published', 'Published'
+        REJECTED = 'rejected', 'Rejected'
+        ARCHIVED = 'archived', 'Archived'
 
     author = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
         related_name="articles",
     )
+    likes = GenericRelation("interactions.Like")
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
-    excerpt = models.TextField(max_length=500, blank=True, help_text="Résumé court affiché dans les listes")
-    body = models.TextField()
-    cover = models.ImageField(upload_to="covers/articles/", null=True, blank=True)
-
-    # Taxonomy
-    category = models.ForeignKey(
-        "taxonomy.Category",
-        on_delete=models.SET_NULL,
-        null=True,
+    content = models.TextField(null=True, blank=True, help_text="Article content (can be rich text)")
+    cover_image = models.ImageField(
+        upload_to="articles/covers/", 
+        null=True, 
         blank=True,
-        related_name="articles",
+        help_text="Article cover image"
     )
-    tags = models.ManyToManyField("taxonomy.Tag", blank=True, related_name="articles")
-
-    # Stats (dénormalisées pour les performances)
-    view_count = models.PositiveIntegerField(default=0, editable=False)
-    read_time = models.PositiveSmallIntegerField(
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    auto_publish = models.BooleanField(
+        default=False,
+        help_text="If True, article publishes immediately without review"
+    )
+    view_count = models.PositiveIntegerField(
         default=0,
         editable=False,
-        help_text="Temps de lecture estimé en minutes",
+        help_text="Number of times article was viewed"
+    )
+
+    # Taxonomy
+    categories = models.ManyToManyField(
+        "taxonomy.Category", 
+        blank=True, 
+        related_name="articles"
+    )
+    tags = models.ManyToManyField(
+        "taxonomy.Tag", 
+        blank=True, 
+        related_name="articles"
     )
 
     # SEO
     meta_title = models.CharField(max_length=70, blank=True)
     meta_description = models.CharField(max_length=160, blank=True)
 
-    # Contrôles
-    allow_comments = models.BooleanField(default=True)
-    is_featured = models.BooleanField(default=False, db_index=True)
-
     class Meta:
         verbose_name = "article"
-        ordering = ["-published_at", "-created_at"]
+        verbose_name_plural = "articles"
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["status", "published_at"]),
+            models.Index(fields=["status", "created_at"]),
             models.Index(fields=["author", "status"]),
         ]
 
@@ -78,10 +89,6 @@ class Article(PublishableModel):
         
         1. Génération automatique du slug unique à partir du titre
         2. Calcul du temps de lecture estimé (basé sur 200 mots/minute)
-        3. Génération automatique de l'extrait si non fourni
-        
-        Le slug est généré une seule fois lors de la création,
-        puis reste inchangé pour préserver les URLs.
         """
         if not self.slug:
             base_slug = slugify(self.title)
@@ -92,15 +99,39 @@ class Article(PublishableModel):
                 self.slug = f"{base_slug}-{n}"
                 n += 1
 
-        # Calcul du temps de lecture (200 mots/min, minimum 1 minute)
-        word_count = len(self.body.split())
-        self.read_time = max(1, round(word_count / 200))
-
-        # Génération automatique de l'extrait (50 premiers mots)
-        if not self.excerpt and self.body:
-            self.excerpt = " ".join(self.body.split()[:50]) + "…"
-
         super().save(*args, **kwargs)
+    
+    @property
+    def reading_time(self):
+        """Estimate reading time in minutes (200 words per minute)."""
+        word_count = len(self.content.split())
+        return max(1, (word_count + 199) // 200)  # Round up
+
+    @property
+    def likes_count(self):
+        """Get total likes count."""
+        return self.likes.count()
+
+    @property
+    def saves_count(self):
+        """Get total saves count."""
+        from apps.interactions.models import SavedArticle
+        return SavedArticle.objects.filter(article=self).count()
+
+    @property
+    def reactions_types(self):
+        """Get list of reaction types for template."""
+        from apps.interactions.models import Reaction
+        return [choice.value for choice in Reaction.ReactionType]
+
+    @property
+    def reaction_counts(self):
+        """Get dictionary of reaction counts by type."""
+        from apps.interactions.models import Reaction
+        return {
+            rt.value: Reaction.objects.filter(article=self, reaction_type=rt.value).count()
+            for rt in Reaction.ReactionType
+        }
 
     def __str__(self):
         return self.title

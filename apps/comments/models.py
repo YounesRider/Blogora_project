@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinLengthValidator
+from django.contrib.contenttypes.fields import GenericRelation
 from apps.core.models import TimeStampedModel
 
 
@@ -16,7 +16,7 @@ class Comment(TimeStampedModel):
         related_name="comments"
     )
     content = models.TextField(
-        validators=[MinLengthValidator(10, message="Le commentaire doit contenir au moins 10 caractères.")]
+        help_text="Comment content (no minimum length)"
     )
     parent = models.ForeignKey(
         'self',
@@ -25,6 +25,7 @@ class Comment(TimeStampedModel):
         blank=True,
         related_name="replies"
     )
+    likes = GenericRelation("interactions.Like")
     
     # Modération
     is_approved = models.BooleanField(default=True)
@@ -57,6 +58,26 @@ class Comment(TimeStampedModel):
     def replies_count(self):
         return self.replies.count()
 
+    @property
+    def likes_count(self):
+        """Get total likes count using generic likes."""
+        return self.likes.count()
+    
+    def is_liked_by(self, user):
+        """Check if comment is liked by a specific user."""
+        from django.contrib.contenttypes.models import ContentType
+        from apps.interactions.models import Like
+        
+        if not user or not user.is_authenticated:
+            return False
+        
+        content_type = ContentType.objects.get_for_model(Comment)
+        return Like.objects.filter(
+            user=user,
+            content_type=content_type,
+            object_id=self.id
+        ).exists()
+
     def get_absolute_url(self):
         return f"{self.article.get_absolute_url()}#comment-{self.id}"
 
@@ -66,12 +87,12 @@ class CommentLike(TimeStampedModel):
     comment = models.ForeignKey(
         Comment,
         on_delete=models.CASCADE,
-        related_name="likes"
+        related_name="comment_likes"
     )
     user = models.ForeignKey(
         "users.User",
         on_delete=models.CASCADE,
-        related_name="comment_likes"
+        related_name="comment_likes_obj"
     )
 
     class Meta:

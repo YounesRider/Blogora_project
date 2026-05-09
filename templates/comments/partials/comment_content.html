@@ -1,0 +1,6 @@
+<div id="comment-content-{{ comment.pk }}" class="comment-content">
+    <div class="comment-text">{{ comment.content|linebreaks }}</div>
+    <small class="text-muted mt-1 d-block">
+        Last updated {{ comment.updated_at|date:"M d, Y at H:i" }}
+    </small>
+</div>

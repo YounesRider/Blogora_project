@@ -10,6 +10,7 @@ urlpatterns = [
     path("category/<slug:category_slug>/", views.ArticleListView.as_view(), name="category"),
     path("tag/<slug:tag_slug>/", views.ArticleListView.as_view(), name="tag"),
     path("create/", views.ArticleCreateView.as_view(), name="create"),
+    path("preview/", views.preview_article, name="preview"),
     path("my-articles/", views.MyArticlesView.as_view(), name="my_articles"),
     path("edit/<slug:slug>/", views.ArticleUpdateView.as_view(), name="update"),
     path("delete/<int:pk>/", views.ArticleDeleteView.as_view(), name="delete"),

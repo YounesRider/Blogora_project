@@ -1,0 +1,41 @@
+{% load static %}
+
+<div id="comment-form" class="comment-form mb-4">
+    {% if user.is_authenticated %}
+    <div class="card">
+        <div class="card-body">
+            <h6 class="card-title">Leave a Comment</h6>
+            <form method="post" 
+                  hx-post="{% url 'comments:create_comment' article.pk %}"
+                  hx-target="#comments-list"
+                  hx-swap="beforebegin"
+                  hx-indicator="#comment-loading">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <textarea name="content" 
+                              class="form-control" 
+                              rows="3" 
+                              placeholder="Share your thoughts..."
+                              required></textarea>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i> Post Comment
+                    </button>
+                </div>
+            </form>
+            <div id="comment-loading" class="htmx-indicator text-center mt-2 d-none">
+                <i class="bi bi-arrow-clockwise bi-spin"></i> Posting comment...
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center">
+            <p class="mb-0">
+                <a href="{% url 'account_login' %}?next={{ request.path }}">Sign in</a> to leave a comment.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>

@@ -243,3 +243,191 @@ function createArticleCard(article) {
     
     return col;
 }
+
+// ========== INTERACTION FUNCTIONS ==========
+
+// Like/Unlike Article
+function toggleLike(articleId) {
+    fetch(`/interactions/like/article/${articleId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const btn = document.getElementById(`like-btn-${articleId}`);
+            const countSpan = document.getElementById(`like-count-${articleId}`);
+            
+            if (data.liked) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+            
+            countSpan.textContent = data.like_count;
+            showToast(data.message, 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling like:', error);
+        showToast('Error updating like', 'error');
+    });
+}
+
+// Save/Unsave Article
+function toggleSave(articleId) {
+    fetch(`/interactions/save/article/${articleId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const btn = document.getElementById(`save-btn-${articleId}`);
+            const countSpan = document.getElementById(`save-count-${articleId}`);
+            
+            if (data.saved) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+            
+            countSpan.textContent = data.save_count;
+            showToast(data.message, 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling save:', error);
+        showToast('Error updating save', 'error');
+    });
+}
+
+// Toggle Reaction (emoji)
+function toggleReaction(reactionType) {
+    // Find article ID from the DOM
+    const articleContainer = document.querySelector('[data-article-id]');
+    const articleId = articleContainer?.dataset.articleId;
+    
+    if (!articleId) {
+        showToast('Article ID not found', 'error');
+        return;
+    }
+
+    fetch(`/interactions/reaction/${articleId}/${reactionType}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateReactionButtons(reactionType, data.user_reactions);
+            updateReactionCounts(data.reaction_counts);
+            showToast(data.message, 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling reaction:', error);
+        showToast('Error updating reaction', 'error');
+    });
+}
+
+// Update reaction button states
+function updateReactionButtons(reactionType, userReactions) {
+    const buttons = document.querySelectorAll('.reaction-btn');
+    buttons.forEach(btn => {
+        const btnType = btn.dataset.reaction;
+        if (userReactions.includes(btnType)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+// Update reaction counts display
+function updateReactionCounts(reactionCounts) {
+    const countsContainer = document.getElementById('reaction-counts');
+    if (!countsContainer) return;
+
+    const emojiMap = {
+        'love': '❤️',
+        'like': '👍',
+        'laugh': '😂',
+        'wow': '😮',
+        'sad': '😢',
+        'angry': '😠'
+    };
+
+    let html = '';
+    for (const [type, count] of Object.entries(reactionCounts)) {
+        if (count > 0) {
+            const emoji = emojiMap[type] || '👍';
+            html += `<span class="badge bg-light text-dark">${emoji} ${count}</span>`;
+        }
+    }
+    countsContainer.innerHTML = html;
+}
+
+// Like/Unlike Comment
+function toggleCommentLike(commentId) {
+    fetch(`/interactions/like/comment/${commentId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const btn = document.getElementById(`comment-like-${commentId}`);
+            const countSpan = document.getElementById(`comment-likes-${commentId}`);
+            const icon = btn?.querySelector('i');
+            
+            if (countSpan) {
+                countSpan.textContent = data.like_count;
+            }
+            
+            if (icon) {
+                if (data.liked) {
+                    icon.classList.remove('bi-heart');
+                    icon.classList.add('bi-heart-fill');
+                } else {
+                    icon.classList.remove('bi-heart-fill');
+                    icon.classList.add('bi-heart');
+                }
+            }
+            
+            showToast(data.message, 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling comment like:', error);
+        showToast('Error updating comment like', 'error');
+    });
+}
+
+// Show/Hide Reply Form
+function showReplyForm(commentId) {
+    const form = document.getElementById(`reply-form-${commentId}`);
+    if (form) {
+        form.style.display = 'block';
+        form.querySelector('textarea')?.focus();
+    }
+}
+
+function hideReplyForm(commentId) {
+    const form = document.getElementById(`reply-form-${commentId}`);
+    if (form) {
+        form.style.display = 'none';
+    }
+}

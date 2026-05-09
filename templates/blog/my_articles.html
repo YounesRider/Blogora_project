@@ -124,7 +124,7 @@
                     </div>
 
                     <h5 class="card-title">{{ article.title|truncatewords:8 }}</h5>
-                    <p class="card-text text-muted">{{ article.excerpt|truncatewords:15 }}</p>
+                    <p class="card-text text-muted">{{ article.content|striptags|truncatewords:15 }}</p>
 
                     <div class="mt-auto">
                         <div class="d-flex justify-content-between align-items-center mb-3">

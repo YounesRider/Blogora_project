@@ -6,8 +6,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.users.views import signup_view
 
 urlpatterns = [
+    # Admin
+    path("admin/", include("apps.admin.urls", namespace="admin")),
+    
     # Blog
     path("", include("apps.blog.urls")),
+    
+    # Core (Collections)
+    path("collections/", include("apps.core.urls", namespace="core")),
     
     # Users - Notre vue d'inscription personnalisée d'abord
     path("account/signup/", signup_view, name="account_signup"),
@@ -19,11 +25,21 @@ urlpatterns = [
     
     # Interactions
     path("interactions/", include("apps.interactions.urls")),
+    
+    # Notifications
+    path("notifications/", include("apps.notifications.urls", namespace="notifications")),
+    
+    # Recommendations
+    path("recommendations/", include("apps.recommendations.urls", namespace="recommendations")),
+    
+    # Dashboard
     path("dashboard/", include("apps.dashboard.urls", namespace="dashboard")),
-    path("comments/", include("apps.comments.urls", namespace="comments")),
 
     # API v1
     path("api/v1/", include("apps.api.urls", namespace="api")),
+    
+    # Taxonomy API
+    path("api/tags/", include("apps.taxonomy.urls", namespace="taxonomy")),
 
     # OpenAPI docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Saved Articles - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Saved Articles</h1>
+            <p class="text-muted mb-0">All articles you've saved across all collections</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'core:collection_list' %}" class="btn btn-outline-primary">
+                <i class="bi bi-folder"></i> Collections
+            </a>
+            <a href="{% url 'core:collection_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> New Collection
+            </a>
+        </div>
+    </div>
+
+    <!-- Collections Summary -->
+    {% if collections %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Your Collections</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for collection in collections %}
+                        <a href="{% url 'core:collection_detail' collection.pk %}" 
+                           class="badge bg-primary text-decoration-none">
+                            {{ collection.name }} ({{ collection.articles.count }})
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Saved Articles -->
+    {% if articles %}
+    <div class="row">
+        {% for item in articles %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                {% if item.article.cover_image %}
+                <img src="{{ item.article.cover_image.url }}" class="card-img-top" alt="{{ item.article.title }}" style="height: 200px; object-fit: cover;">
+                {% endif %}
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">
+                        <a href="{{ item.article.get_absolute_url }}" class="text-decoration-none">
+                            {{ item.article.title|truncatechars:50 }}
+                        </a>
+                    </h5>
+                    <p class="card-text text-muted flex-grow-1">
+                        {{ item.article.content|striptags|truncatechars:100 }}
+                    </p>
+                    <div class="mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-folder"></i> In: {{ item.collections }}
+                        </small>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-person"></i> {{ item.article.author.username }}
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar"></i> {{ item.article.created_at|date:"M d, Y" }}
+                        </small>
+                    </div>
+                    <div class="mt-2">
+                        <a href="{{ item.article.get_absolute_url }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> Read
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-bookmark fs-1 text-muted"></i>
+        <h4 class="mt-3">No Saved Articles Yet</h4>
+        <p class="text-muted mb-4">Start exploring and saving articles to build your personal reading list.</p>
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="{% url 'blog:article_list' %}" class="btn btn-primary">
+                <i class="bi bi-search"></i> Explore Articles
+            </a>
+            <a href="{% url 'core:collection_create' %}" class="btn btn-outline-primary">
+                <i class="bi bi-plus-circle"></i> Create Collection
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .card-img-top {
+        border-top-left-radius: var(--radius-md);
+        border-top-right-radius: var(--radius-md);
+    }
+    
+    .badge {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+    }
+</style>
+
+{% endblock %}

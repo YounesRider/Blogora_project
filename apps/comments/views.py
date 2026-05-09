@@ -5,24 +5,26 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
-from .models import Comment, CommentLike
+from .models import Comment
 from apps.blog.models import Article
 
 
 @login_required
 @require_POST
 def create_comment(request, article_id):
-    """Créer un commentaire sur un article."""
+    """Create a comment on an article."""
     article = get_object_or_404(Article, id=article_id, status='published')
     
     content = request.POST.get('content', '').strip()
     parent_id = request.POST.get('parent_id')
     
-    if len(content) < 10:
-        messages.error(request, 'Le commentaire doit contenir au moins 10 caractères.')
+    if not content:
+        if request.headers.get('HX-Request'):
+            return JsonResponse({'error': 'Comment content cannot be empty.'})
+        messages.error(request, 'Comment content cannot be empty.')
         return redirect(article.get_absolute_url())
     
-    # Vérifier si c'est une réponse
+    # Check if it's a reply
     parent = None
     if parent_id:
         parent = get_object_or_404(Comment, id=parent_id, article=article)
@@ -34,35 +36,23 @@ def create_comment(request, article_id):
         parent=parent
     )
     
-    messages.success(request, 'Votre commentaire a été publié !')
-    return redirect(comment.get_absolute_url())
-
-
-@login_required
-@require_POST
-def like_comment(request, comment_id):
-    """Aimer ou ne plus aimer un commentaire."""
-    comment = get_object_or_404(Comment, id=comment_id)
-    
-    like, created = CommentLike.objects.get_or_create(
-        comment=comment,
-        user=request.user
-    )
-    
-    if not created:
-        # L'utilisateur retirait son like
-        like.delete()
-        liked = False
-    else:
-        liked = True
-    
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+    # Return HTMX response
+    if request.headers.get('HX-Request'):
+        from django.template.loader import render_to_string
+        html = render_to_string('comments/partials/comment.html', {
+            'comment': comment,
+            'user': request.user
+        })
         return JsonResponse({
-            'liked': liked,
-            'likes_count': comment.likes.count()
+            'success': True,
+            'html': html,
+            'message': 'Comment posted successfully!'
         })
     
-    return redirect(comment.get_absolute_url())
+    messages.success(request, 'Your comment has been posted!')
+    return redirect(article.get_absolute_url())
+
+
 
 
 @login_required
@@ -81,18 +71,32 @@ def delete_comment(request, comment_id):
 
 @login_required
 def edit_comment(request, comment_id):
-    """Modifier son propre commentaire."""
+    """Edit your own comment."""
     comment = get_object_or_404(Comment, id=comment_id, author=request.user)
     
     if request.method == 'POST':
         content = request.POST.get('content', '').strip()
         
-        if len(content) < 10:
-            messages.error(request, 'Le commentaire doit contenir au moins 10 caractères.')
+        if not content:
+            messages.error(request, 'Comment content cannot be empty.')
         else:
             comment.content = content
             comment.save()
-            messages.success(request, 'Votre commentaire a été modifié.')
+            
+            # Return HTMX response
+            if request.headers.get('HX-Request'):
+                from django.template.loader import render_to_string
+                html = render_to_string('comments/partials/comment_content.html', {
+                    'comment': comment,
+                    'user': request.user
+                })
+                return JsonResponse({
+                    'success': True,
+                    'html': html,
+                    'message': 'Comment updated successfully!'
+                })
+            
+            messages.success(request, 'Your comment has been updated.')
             return redirect(comment.get_absolute_url())
     
     return render(request, 'comments/edit_comment.html', {'comment': comment})
