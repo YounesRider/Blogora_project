@@ -10,11 +10,13 @@ MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware"] + MIDDLEWARE
 
 INTERNAL_IPS = ["127.0.0.1"]
 
-# SQLite pour dev rapide (surcharge DATABASE_URL si non défini)
-DATABASES.setdefault("default", {
-    "ENGINE": "django.db.backends.sqlite3",
-    "NAME": BASE_DIR / "db.sqlite3",
-})
+# SQLite pour dev rapide (override explicite, sauf si USE_MYSQL_DEV=true)
+USE_MYSQL_DEV = env.bool("USE_MYSQL_DEV", default=False)
+if not USE_MYSQL_DEV:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 
 # Email dans la console
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

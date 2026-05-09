@@ -59,7 +59,33 @@ def build_user_article_matrix() -> pd.DataFrame:
     # Agrégation des interactions multiples pour le même utilisateur/article
     df = pd.DataFrame(records)
     df = df.groupby(["user_id", "article_id"], as_index=False)["value"].sum()
+    # Negative sampling: inject a few unseen items per user with tiny score.
+    df = add_negative_samples(df)
     df = df.rename(columns={"value": "score"})
+    return df
+
+
+def add_negative_samples(df: pd.DataFrame, per_user: int = 3) -> pd.DataFrame:
+    """Add synthetic low-score interactions for unseen user/article pairs."""
+    if df.empty:
+        return df
+
+    user_ids = df["user_id"].unique().tolist()
+    article_ids = df["article_id"].unique().tolist()
+    seen_pairs = set(zip(df["user_id"], df["article_id"]))
+    negatives = []
+
+    rng = np.random.default_rng(seed=42)
+    for user_id in user_ids:
+        unseen = [article_id for article_id in article_ids if (user_id, article_id) not in seen_pairs]
+        if not unseen:
+            continue
+        sampled = rng.choice(unseen, size=min(per_user, len(unseen)), replace=False)
+        for article_id in sampled:
+            negatives.append({"user_id": user_id, "article_id": article_id, "value": 0.15})
+
+    if negatives:
+        df = pd.concat([df, pd.DataFrame(negatives)], ignore_index=True)
     return df
 
 

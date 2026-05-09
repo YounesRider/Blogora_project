@@ -5,6 +5,21 @@ from apps.recommendations.predict import get_recommendations
 from apps.users.models import User
 
 
+def generate_user_recommendations(user_id: int, top_k: int = 50) -> int:
+    user = User.objects.filter(id=user_id).first()
+    if not user:
+        return 0
+
+    RecommendationScore.objects.filter(user=user).delete()
+    recommended_ids = get_recommendations(user.id, top_k=top_k, exclude_seen=True)
+    scores = []
+    for rank, article_id in enumerate(recommended_ids):
+        score = 1.0 - (rank / max(top_k, 1))
+        scores.append(RecommendationScore(user=user, article_id=article_id, score=score))
+    RecommendationScore.objects.bulk_create(scores, ignore_conflicts=True)
+    return len(scores)
+
+
 class Command(BaseCommand):
     help = 'Génère les scores de recommandation pour tous les utilisateurs'
 

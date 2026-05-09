@@ -94,6 +94,22 @@
                             articles in these areas.
                         </p>
 
+                            <div class="mb-4">
+                            <label class="form-label">Account Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="role" id="role_user" value="user" checked>
+                                <label class="form-check-label" for="role_user">
+                                    Regular User
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="role" id="role_author" value="author">
+                                <label class="form-check-label" for="role_author">
+                                    Author
+                                </label>
+                            </div>
+                            <small class="text-muted">Choose your account type. Authors can publish articles once approved by an admin.</small>
+                        </div>
                         <div class="row">
                             {% for category in categories %}
                             <div class="col-md-6 col-lg-4 mb-3">
@@ -104,15 +120,14 @@
                                                 value="{{ category.id }}" id="cat_{{ category.id }}">
                                             <label class="form-check-label w-100" for="cat_{{ category.id }}">
                                                 <h6 class="mb-1">{{ category.name }}</h6>
-                                                <small class="text-muted">{{ category.description|truncatewords:10
-                                                    }}</small>
+                                                <small class="text-muted">{{ category.description|truncatewords:10 }}</small>
                                             </label>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             {% empty %}
-                            <div class="col-12">
+                            <div class="col-12" id="categories-empty-state">
                                 <p class="text-muted">No categories available at the moment.</p>
                             </div>
                             {% endfor %}
@@ -232,31 +247,33 @@
         document.getElementById('signup-form').submit();
     }
 
-    // Handle category card clicks
-    document.querySelectorAll('.category-card').forEach(card => {
-        card.addEventListener('click', function (e) {
-            if (e.target.type !== 'checkbox') {
-                const checkbox = this.querySelector('input[type="checkbox"]');
-                const wasChecked = checkbox.checked;
-                
-                if (!wasChecked && selectedCount >= maxSelections) {
-                    alert(`You can select maximum ${maxSelections} categories.`);
-                    return;
-                }
-                
-                checkbox.checked = !checkbox.checked;
-                updateCardSelection(this);
-                updateSelectedCount();
-            }
-        });
+    function bindCategoryCards() {
+        document.querySelectorAll('.category-card').forEach(card => {
+            card.addEventListener('click', function (e) {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    const wasChecked = checkbox.checked;
 
-        // Update style when checkbox changes
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        checkbox.addEventListener('change', function () {
-            updateCardSelection(card);
-            updateSelectedCount();
+                    if (!wasChecked && selectedCount >= maxSelections) {
+                        alert(`You can select maximum ${maxSelections} categories.`);
+                        return;
+                    }
+
+                    checkbox.checked = !checkbox.checked;
+                    updateCardSelection(this);
+                    updateSelectedCount();
+                }
+            });
+
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', function () {
+                updateCardSelection(card);
+                updateSelectedCount();
+            });
         });
-    });
+    }
+
+    bindCategoryCards();
 
     function updateCardSelection(card) {
         const checkbox = card.querySelector('input[type="checkbox"]');

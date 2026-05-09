@@ -217,6 +217,10 @@ def admin_approve_article(request, pk):
             message=f'Your article "{article.title}" has been approved and published!',
             content_object=article
         )
+        
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+        if next_url:
+            return redirect(next_url)
     
     return redirect('admin:articles')
 
@@ -245,6 +249,10 @@ def admin_reject_article(request, pk):
             message=f'Your article "{article.title}" has been rejected. Please review and resubmit.',
             content_object=article
         )
+        
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+        if next_url:
+            return redirect(next_url)
     
     return redirect('admin:articles')
 

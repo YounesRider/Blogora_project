@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Create article - Smart Blog AI{% endblock %}
+{% block title %}Edit article - Smart Blog AI{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -9,7 +9,7 @@
         <div class="col-lg-9">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Create a new article</h4>
+                    <h4 class="mb-0">Edit article</h4>
                 </div>
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data" id="article-form">
@@ -46,6 +46,12 @@
                             <div id="image-preview" class="mt-2" style="display: none;">
                                 <img id="preview-img" src="" alt="Image preview" class="img-fluid rounded" style="max-height: 200px;">
                             </div>
+                            {% if object.cover_image %}
+                            <div class="mt-2">
+                                <small class="text-muted">Current image:</small><br>
+                                <img src="{{ object.cover_image.url }}" alt="Current cover image" class="img-fluid rounded" style="max-height: 150px;">
+                            </div>
+                            {% endif %}
                             <small class="text-muted">Optional. Supported formats: JPEG, PNG, GIF, WebP, SVG. Max size: 5MB.</small>
                         </div>
 

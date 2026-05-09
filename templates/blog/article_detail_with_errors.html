@@ -325,7 +325,8 @@ const articleData = {
 function toggleLike(articleId) {
     console.log('Toggling like for article:', articleId);
     
-    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || 
+                    document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
                     document.querySelector('meta[name="csrfmiddlewaretoken"]')?.content || '';
     
     fetch('/interactions/like/article/' + articleId + '/', {
@@ -370,7 +371,8 @@ function toggleLike(articleId) {
 function toggleSave(articleId) {
     console.log('Toggling save for article:', articleId);
     
-    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || 
+                    document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
                     document.querySelector('meta[name="csrfmiddlewaretoken"]')?.content || '';
     
     fetch('/interactions/save/article/' + articleId + '/', {
@@ -415,7 +417,8 @@ function toggleSave(articleId) {
 function toggleReaction(reactionType) {
     console.log('Toggling reaction:', reactionType);
     
-    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || 
+                    document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || 
                     document.querySelector('meta[name="csrfmiddlewaretoken"]')?.content || '';
     
     fetch('/interactions/reaction/' + articleData.id + '/' + reactionType + '/', {

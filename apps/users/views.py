@@ -28,17 +28,17 @@ def profile_view(request):
     # Articles récents de l'utilisateur
     user_articles = Article.objects.filter(
         author=request.user
-    ).select_related('category').order_by('-created_at')[:5]
+    ).prefetch_related('categories').order_by('-created_at')[:5]
     
     # Articles aimés récemment
     liked_articles = Article.objects.filter(
         likes__user=request.user
-    ).select_related('author', 'category').order_by('-likes__created_at')[:5]
+    ).select_related('author').prefetch_related('categories').order_by('-likes__created_at')[:5]
     
     # Articles sauvegardés
     saved_articles = Article.objects.filter(
         saves__user=request.user
-    ).select_related('author', 'category').order_by('-saves__created_at')[:5]
+    ).select_related('author').prefetch_related('categories').order_by('-saves__created_at')[:5]
     
     context = {
         'profile': profile,
@@ -145,7 +145,6 @@ def signup_view(request):
     
     # Utiliser la vue signup avec notre contexte
     response = signup_view_class(request)
-    
     # Si c'est une réponse de formulaire (GET après POST échoué), ajouter les catégories
     if response.status_code == 200 and hasattr(response, 'context_data'):
         response.context_data['categories'] = categories
@@ -248,3 +247,11 @@ def user_profile(request, username):
     }
     
     return render(request, 'users/user_profile.html', context)
+
+
+@login_required
+def logout_view(request):
+    """Custom styled logout view."""
+    from django.contrib.auth import logout
+    logout(request)
+    return render(request, 'account/logout.html')

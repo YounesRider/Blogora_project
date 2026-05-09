@@ -2,8 +2,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from apps.users.views import signup_view
+from apps.users.views import signup_view, logout_view
 
 urlpatterns = [
     # Admin
@@ -15,8 +16,11 @@ urlpatterns = [
     # Core (Collections)
     path("collections/", include("apps.core.urls", namespace="core")),
     
-    # Users - Notre vue d'inscription personnalisée d'abord
-    path("account/signup/", signup_view, name="account_signup"),
+    # Users - custom signup and logout views
+    path("accounts/signup/", signup_view, name="account_signup"),
+    path("account/signup/", RedirectView.as_view(url="/accounts/signup/", permanent=False)),
+    path("accounts/logout/", logout_view, name="account_logout"),
+    path("account/logout/", RedirectView.as_view(url="/accounts/logout/", permanent=False)),
     path("accounts/", include("allauth.urls")),
     path("users/", include("apps.users.urls")),
     

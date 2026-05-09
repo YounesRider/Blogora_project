@@ -11,6 +11,7 @@ from apps.blog.models import Article
 from apps.comments.models import Comment
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def like_article(request, article_id):
@@ -47,6 +48,7 @@ def like_article(request, article_id):
     })
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def like_comment(request, comment_id):
@@ -83,6 +85,7 @@ def like_comment(request, comment_id):
     })
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def save_article(request, article_id):
@@ -113,6 +116,7 @@ def save_article(request, article_id):
     })
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def toggle_reaction(request, article_id, reaction_type):
@@ -201,6 +205,7 @@ def get_article_reactions(request, article_id):
     })
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def batch_toggle_reaction(request, article_id):

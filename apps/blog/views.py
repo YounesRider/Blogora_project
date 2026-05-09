@@ -20,6 +20,7 @@ from django.db.models import Q, Count, F, Sum, Subquery, OuterRef
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
@@ -122,6 +123,37 @@ class ArticleListView(ListView):
             except:
                 # Fallback if recommendations fail
                 context['recommended_articles'] = Article.objects.none()
+
+            # Build liked/saved state for the current user on listed articles
+            from apps.interactions.models import Like, SavedArticle
+            from django.contrib.contenttypes.models import ContentType
+            article_content_type = ContentType.objects.get_for_model(Article)
+            articles_page = context['articles']
+            article_objs = getattr(articles_page, 'object_list', articles_page)
+            article_ids = []
+            try:
+                article_ids = list(article_objs.values_list('pk', flat=True))
+            except Exception:
+                article_ids = [article.pk for article in article_objs]
+
+            liked_article_ids = set(
+                Like.objects.filter(
+                    user=self.request.user,
+                    content_type=article_content_type,
+                    object_id__in=article_ids
+                ).values_list('object_id', flat=True)
+            )
+            saved_article_ids = set(
+                SavedArticle.objects.filter(
+                    user=self.request.user,
+                    article__pk__in=article_ids
+                ).values_list('article_id', flat=True)
+            )
+            context['user_liked_article_ids'] = liked_article_ids
+            context['user_saved_article_ids'] = saved_article_ids
+        else:
+            context['user_liked_article_ids'] = set()
+            context['user_saved_article_ids'] = set()
         
         # Popular articles (fallback)
         from apps.interactions.models import Like
@@ -177,7 +209,7 @@ class ArticleDetailView(DetailView):
         similar_articles = Article.objects.filter(
             status='published'
         ).filter(
-            Q(categories__in=article.categories.all()) | 
+            Q(categories__in=article.categories.all()) |
             Q(tags__in=article.tags.all())
         ).exclude(pk=article.pk).distinct().select_related('author')[:6]
         
@@ -320,7 +352,7 @@ class MyArticlesView(LoginRequiredMixin, ListView):
     paginate_by = 12
     
     def get_queryset(self):
-        return Article.objects.filter(author=self.request.user).select_related('category')
+        return Article.objects.filter(author=self.request.user).prefetch_related('categories')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -334,7 +366,6 @@ class MyArticlesView(LoginRequiredMixin, ListView):
         context['draft_articles'] = Article.objects.filter(author=self.request.user, status='draft').count()
         context['pending_articles'] = Article.objects.filter(author=self.request.user, status='pending_review').count()
         context['total_views'] = Article.objects.filter(author=self.request.user).aggregate(total=Sum('view_count'))['total'] or 0
-        
         return context
 
 
@@ -378,6 +409,22 @@ def home(request):
         except:
             # Fallback if recommendations fail
             context['recommended_articles'] = Article.objects.none()
+
+    from apps.interactions.models import Like
+    article_content_type = ContentType.objects.get_for_model(Article)
+    likes_subquery = Like.objects.filter(
+        content_type=article_content_type,
+        object_id=OuterRef('pk')
+    ).values('object_id').annotate(count=Count('id')).values('count')[:1]
+    context['popular_articles'] = (
+        Article.objects.filter(status='published')
+        .select_related('author')
+        .annotate(
+            like_count=Subquery(likes_subquery, output_field=models.IntegerField()),
+            popularity_score=F('view_count') + Count('saves') * 2,
+        )
+        .order_by('-popularity_score')[:5]
+    )
     
     return render(request, 'blog/home.html', context)
 
@@ -420,3 +467,13 @@ def preview_article(request):
     temp_article = TempArticle(title, content, status, request.user, timezone.now(), timezone.now())
     
     return render(request, 'blog/article_preview.html', {'article': temp_article})
+
+
+@login_required
+@require_POST
+def submit_for_review(request, slug):
+    article = get_object_or_404(Article, slug=slug, author=request.user)
+    article.status = "pending_review"
+    article.save(update_fields=["status", "updated_at"])
+    messages.success(request, "Article submitted for review.")
+    return redirect("blog:my_articles")

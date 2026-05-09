@@ -90,6 +90,9 @@
                                 <button type="button" class="btn btn-outline-warning filter-btn" data-filter="draft">
                                     Brouillons ({{ draft_articles }})
                                 </button>
+                                <button type="button" class="btn btn-outline-info filter-btn" data-filter="pending_review">
+                                    En revue ({{ pending_articles }})
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -103,8 +106,8 @@
         {% for article in articles %}
         <div class="col-lg-6 col-xl-4 mb-4 article-item" data-status="{{ article.status }}">
             <div class="card h-100 shadow-sm">
-                {% if article.featured_image %}
-                <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.title }}"
+                {% if article.cover_image %}
+                <img src="{{ article.cover_image.url }}" class="card-img-top" alt="{{ article.title }}"
                     style="height: 200px; object-fit: cover;">
                 {% else %}
                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
@@ -115,7 +118,7 @@
 
                 <div class="card-body d-flex flex-column">
                     <div class="mb-2">
-                        <span class="badge bg-{{ article.status|yesno:'success,warning' }}">
+                        <span class="badge bg-{% if article.status == 'published' %}success{% elif article.status == 'pending_review' %}info{% else %}warning{% endif %}">
                             {{ article.get_status_display }}
                         </span>
                         {% if article.category %}
@@ -145,6 +148,14 @@
                             <a href="{% url 'blog:update' article.slug %}" class="btn btn-outline-secondary btn-sm">
                                 <i class="bi bi-pencil"></i> Modifier
                             </a>
+                            {% if article.status == 'draft' %}
+                            <form method="post" action="{% url 'blog:submit_review' article.slug %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-send"></i> Soumettre
+                                </button>
+                            </form>
+                            {% endif %}
                             <button type="button" class="btn btn-outline-danger btn-sm"
                                 data-article-id="{{ article.id }}" data-article-title="{{ article.title|escapejs }}"
                                 onclick="showDeleteModal(this)">

@@ -19,6 +19,27 @@
                 <h4>{{ user.full_name|default:user.email }}</h4>
                 <p class="text-muted">{{ user.bio|default:"Pas de bio" }}</p>
 
+                <!-- User Type Badge -->
+                <div class="mb-3">
+                    {% if user.role == 'admin' %}
+                    <span class="badge bg-danger">
+                        <i class="bi bi-shield-check"></i> Administrator
+                    </span>
+                    {% elif user.role == 'author' %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-pencil-square"></i> Author
+                    </span>
+                    {% elif user.role == 'user' %}
+                    <span class="badge bg-info">
+                        <i class="bi bi-person"></i> Reader
+                    </span>
+                    {% else %}
+                    <span class="badge bg-secondary">
+                        <i class="bi bi-question-circle"></i> Guest
+                    </span>
+                    {% endif %}
+                </div>
+
                 {% if profile.website %}
                 <a href="{{ profile.website }}" class="btn btn-outline-primary btn-sm me-2" target="_blank">
                     <i class="bi bi-globe"></i> Site web
@@ -106,6 +127,7 @@
     <div class="col-md-8">
         <!-- Tabs -->
         <ul class="nav nav-tabs" id="profileTabs" role="tablist">
+            {% if user.role == 'author' or user.role == 'admin' %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="articles-tab" data-bs-toggle="tab" data-bs-target="#articles"
                     type="button">
@@ -117,6 +139,14 @@
                     <i class="bi bi-heart"></i> Aimés ({{ liked_articles.count }})
                 </button>
             </li>
+            {% else %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="liked-tab" data-bs-toggle="tab" data-bs-target="#liked"
+                    type="button">
+                    <i class="bi bi-heart"></i> Aimés ({{ liked_articles.count }})
+                </button>
+            </li>
+            {% endif %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="saved-tab" data-bs-toggle="tab" data-bs-target="#saved" type="button">
                     <i class="bi bi-bookmark"></i> Sauvegardés ({{ saved_articles.count }})
@@ -126,6 +156,7 @@
 
         <div class="tab-content" id="profileTabsContent">
             <!-- Mes articles -->
+            {% if user.role == 'author' or user.role == 'admin' %}
             <div class="tab-pane fade show active" id="articles" role="tabpanel">
                 <div class="mt-3">
                     {% for article in user_articles %}
@@ -151,8 +182,8 @@
                                         <i class="bi bi-heart ms-2"></i> {{ article.likes.count }}
                                     </small>
                                 </div>
-                                {% if article.cover %}
-                                <img src="{{ article.cover.url }}" class="rounded ms-3" width="80" height="80"
+                                {% if article.cover_image %}
+                                <img src="{{ article.cover_image.url }}" class="rounded ms-3" width="80" height="80"
                                     alt="{{ article.title }}">
                                 {% endif %}
                             </div>
@@ -167,9 +198,10 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <!-- Articles aimés -->
-            <div class="tab-pane fade" id="liked" role="tabpanel">
+            <div class="tab-pane fade {% if user.role != 'author' and user.role != 'admin' %}show active{% endif %}" id="liked" role="tabpanel">
                 <div class="mt-3">
                     {% for article in liked_articles %}
                     <div class="card mb-3">
@@ -191,8 +223,8 @@
                                         <i class="bi bi-eye ms-2"></i> {{ article.view_count }}
                                     </small>
                                 </div>
-                                {% if article.cover %}
-                                <img src="{{ article.cover.url }}" class="rounded ms-3" width="80" height="80"
+                                {% if article.cover_image %}
+                                <img src="{{ article.cover_image.url }}" class="rounded ms-3" width="80" height="80"
                                     alt="{{ article.title }}">
                                 {% endif %}
                             </div>
@@ -231,8 +263,8 @@
                                         <i class="bi bi-eye ms-2"></i> {{ article.view_count }}
                                     </small>
                                 </div>
-                                {% if article.cover %}
-                                <img src="{{ article.cover.url }}" class="rounded ms-3" width="80" height="80"
+                                {% if article.cover_image %}
+                                <img src="{{ article.cover_image.url }}" class="rounded ms-3" width="80" height="80"
                                     alt="{{ article.title }}">
                                 {% endif %}
                             </div>

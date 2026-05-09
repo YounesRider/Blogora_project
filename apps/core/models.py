@@ -29,6 +29,7 @@ class PublishableModel(TimeStampedModel):
     """
     class Status(models.TextChoices):
         DRAFT = "draft", "Brouillon"
+        PENDING_REVIEW = "pending_review", "En attente de revue"
         PUBLISHED = "published", "Publié"
         ARCHIVED = "archived", "Archivé"
 

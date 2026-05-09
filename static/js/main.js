@@ -260,11 +260,18 @@ function toggleLike(articleId) {
         if (data.success) {
             const btn = document.getElementById(`like-btn-${articleId}`);
             const countSpan = document.getElementById(`like-count-${articleId}`);
+            const icon = btn.querySelector('i');
             
             if (data.liked) {
-                btn.classList.add('active');
+                btn.classList.add('active', 'btn-primary');
+                btn.classList.remove('btn-outline-primary');
+                icon.classList.add('bi-heart-fill');
+                icon.classList.remove('bi-heart');
             } else {
-                btn.classList.remove('active');
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-primary');
+                icon.classList.add('bi-heart');
+                icon.classList.remove('bi-heart-fill');
             }
             
             countSpan.textContent = data.like_count;
@@ -291,11 +298,18 @@ function toggleSave(articleId) {
         if (data.success) {
             const btn = document.getElementById(`save-btn-${articleId}`);
             const countSpan = document.getElementById(`save-count-${articleId}`);
+            const icon = btn.querySelector('i');
             
             if (data.saved) {
-                btn.classList.add('active');
+                btn.classList.add('active', 'btn-success');
+                btn.classList.remove('btn-outline-success');
+                icon.classList.add('bi-bookmark-fill');
+                icon.classList.remove('bi-bookmark');
             } else {
-                btn.classList.remove('active');
+                btn.classList.remove('active', 'btn-success');
+                btn.classList.add('btn-outline-success');
+                icon.classList.add('bi-bookmark');
+                icon.classList.remove('bi-bookmark-fill');
             }
             
             countSpan.textContent = data.save_count;

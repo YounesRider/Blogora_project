@@ -58,11 +58,25 @@ class ArticleCreateForm(forms.ModelForm):
             raise forms.ValidationError("Title must be at least 5 characters.")
         return title
     
-    def clean_content(self):
-        content = self.cleaned_data.get('content')
-        if len(content) < 50:
-            raise forms.ValidationError("Content must be at least 50 characters.")
-        return content
+    def clean_cover_image(self):
+        cover_image = self.cleaned_data.get('cover_image')
+        if cover_image:
+            # Validate file size (max 5MB)
+            if cover_image.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("Image file too large ( > 5MB )")
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+            if hasattr(cover_image, 'content_type') and cover_image.content_type not in allowed_types:
+                raise forms.ValidationError(f"Unsupported image type. Allowed: {', '.join(allowed_types)}")
+            
+            # Validate file extension as backup
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+            ext = cover_image.name.lower().split('.')[-1] if '.' in cover_image.name else ''
+            if f'.{ext}' not in allowed_extensions:
+                raise forms.ValidationError(f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}")
+        
+        return cover_image
 
 
 class ArticleUpdateForm(forms.ModelForm):
@@ -112,3 +126,23 @@ class ArticleUpdateForm(forms.ModelForm):
                 ('draft', 'Draft'),
                 ('pending_review', 'Submit for Review')
             ]
+    
+    def clean_cover_image(self):
+        cover_image = self.cleaned_data.get('cover_image')
+        if cover_image:
+            # Validate file size (max 5MB)
+            if cover_image.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("Image file too large ( > 5MB )")
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+            if hasattr(cover_image, 'content_type') and cover_image.content_type not in allowed_types:
+                raise forms.ValidationError(f"Unsupported image type. Allowed: {', '.join(allowed_types)}")
+            
+            # Validate file extension as backup
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+            ext = cover_image.name.lower().split('.')[-1] if '.' in cover_image.name else ''
+            if f'.{ext}' not in allowed_extensions:
+                raise forms.ValidationError(f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}")
+        
+        return cover_image

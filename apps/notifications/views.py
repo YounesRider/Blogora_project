@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Count
 from django.contrib import messages
@@ -127,7 +127,7 @@ def notification_dropdown(request):
         'unread_count': unread_count
     })
     
-    return JsonResponse({'html': html})
+    return HttpResponse(html, content_type='text/html')
 
 
 @login_required

@@ -89,6 +89,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.site_name",
+                "apps.blog.context_processors.navbar_counts",
             ],
         },
     },
@@ -97,11 +98,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ─── Database ────────────────────────────────────────────────────────────────
-# Using SQLite for development to avoid MySQL connection issues
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
+        "NAME": env("DB_NAME", default=str(BASE_DIR / "db.sqlite3")),
+        "USER": env("DB_USER", default=""),
+        "PASSWORD": env("DB_PASSWORD", default=""),
+        "HOST": env("DB_HOST", default=""),
+        "PORT": env("DB_PORT", default=""),
     }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -125,6 +129,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_FORMS = {
+    'signup': 'apps.users.forms.CustomSignupForm',
+}
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
@@ -230,10 +237,11 @@ TEMPLATE_LOADERS = [
 ]
 
 # Database optimization (SQLite-specific)
-DATABASES['default']['OPTIONS'] = {
-    'timeout': 20,
-    'check_same_thread': False,
-}
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"]["OPTIONS"] = {
+        "timeout": 20,
+        "check_same_thread": False,
+    }
 
 # Logging for performance monitoring
 LOGGING = {
