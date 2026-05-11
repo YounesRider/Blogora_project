@@ -18,18 +18,35 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function trackReadingTime() {
-    const articles = document.querySelectorAll('article[data-article-id]');
-    
-    articles.forEach(article => {
-        const articleId = article.dataset.articleId;
-        const startTime = Date.now();
-        
-        window.addEventListener('beforeunload', function() {
-            const duration = Math.floor((Date.now() - startTime) / 1000);
-            if (duration > 10) { // Envoyer seulement si > 10s de lecture
-                sendReadingTime(articleId, duration);
-            }
-        });
+    const article = document.querySelector('article[data-article-id]');
+    if (!article) {
+        return;
+    }
+
+    const articleId = article.dataset.articleId;
+    const startTime = Date.now();
+    let hasSent = false;
+
+    function sendIfReady() {
+        if (hasSent) {
+            return;
+        }
+
+        const duration = Math.floor((Date.now() - startTime) / 1000);
+        if (duration <= 10) {
+            return;
+        }
+
+        hasSent = true;
+        sendReadingTime(articleId, duration);
+    }
+
+    window.addEventListener('beforeunload', sendIfReady);
+    window.addEventListener('pagehide', sendIfReady);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') {
+            sendIfReady();
+        }
     });
 }
 
@@ -40,7 +57,8 @@ function sendReadingTime(articleId, duration) {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: JSON.stringify({ duration: duration })
+        body: JSON.stringify({ duration: duration }),
+        keepalive: true,
     }).catch(error => console.log('Erreur tracking lecture:', error));
 }
 

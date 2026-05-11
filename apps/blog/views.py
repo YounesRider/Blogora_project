@@ -126,7 +126,6 @@ class ArticleListView(ListView):
 
             # Build liked/saved state for the current user on listed articles
             from apps.interactions.models import Like, SavedArticle
-            from django.contrib.contenttypes.models import ContentType
             article_content_type = ContentType.objects.get_for_model(Article)
             articles_page = context['articles']
             article_objs = getattr(articles_page, 'object_list', articles_page)
@@ -294,7 +293,7 @@ class ArticleDetailView(DetailView):
         return context
 
 
-class ArticleCreateView(AuthorRequiredMixin, OwnerRequiredMixin, CreateView):
+class ArticleCreateView(AuthorRequiredMixin, CreateView):
     """Création d'un nouvel article."""
     model = Article
     form_class = ArticleCreateForm
@@ -344,7 +343,7 @@ class ArticleUpdateView(AuthorRequiredMixin, OwnerRequiredMixin, UpdateView):
         return context
 
 
-class MyArticlesView(LoginRequiredMixin, ListView):
+class MyArticlesView(AuthorRequiredMixin, ListView):
     """Liste des articles de l'utilisateur connecté."""
     model = Article
     template_name = 'blog/my_articles.html'

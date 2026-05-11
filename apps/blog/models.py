@@ -6,6 +6,7 @@ incluant les fonctionnalités de publication, les métadonnées SEO,
 et les statistiques d'engagement.
 """
 from django.db import models
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.urls import reverse
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
@@ -104,7 +105,8 @@ class Article(TimeStampedModel):
     @property
     def reading_time(self):
         """Estimate reading time in minutes (200 words per minute)."""
-        word_count = len(self.content.split())
+        content_text = strip_tags(self.content or "")
+        word_count = len(content_text.split())
         return max(1, (word_count + 199) // 200)  # Round up
 
     @property
