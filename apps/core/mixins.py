@@ -15,6 +15,19 @@ class AuthorRequiredMixin(LoginRequiredMixin):
         raise PermissionDenied("You must be an author to access this page.")
 
 
+class ModeratorRequiredMixin(LoginRequiredMixin):
+    """
+    Allows access only to users with role='moderator' or role='admin'.
+    """
+    def test_func(self):
+        return self.request.user.role in ['moderator', 'admin']
+    
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return super().handle_no_permission()
+        raise PermissionDenied("You must be a moderator to access this page.")
+
+
 class AdminRequiredMixin(LoginRequiredMixin):
     """
     Allows access only to users with role='admin' or is_staff=True.

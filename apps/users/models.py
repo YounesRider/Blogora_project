@@ -16,6 +16,7 @@ class User(AbstractUser):
         GUEST = 'guest', 'Guest'
         USER = 'user', 'User'
         AUTHOR = 'author', 'Author'
+        MODERATOR = 'moderator', 'Moderator'
         ADMIN = 'admin', 'Admin'
     
     role = models.CharField(
@@ -136,3 +137,57 @@ class Follow(TimeStampedModel):
         if self.follower == self.following:
             from django.core.exceptions import ValidationError
             raise ValidationError("Users cannot follow themselves.")
+
+
+class Moderator(TimeStampedModel):
+    """
+    Moderator profile for content moderation.
+    Only admins can create and manage moderators.
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="moderator_profile",
+        help_text="User with moderator role"
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="moderators_created",
+        help_text="Admin who created this moderator"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this moderator can perform moderation actions"
+    )
+    
+    # Moderation statistics
+    articles_reviewed = models.PositiveIntegerField(default=0)
+    articles_approved = models.PositiveIntegerField(default=0)
+    articles_rejected = models.PositiveIntegerField(default=0)
+    comments_deleted = models.PositiveIntegerField(default=0)
+    
+    # Permissions
+    can_review_articles = models.BooleanField(default=True)
+    can_delete_articles = models.BooleanField(default=True)
+    can_delete_comments = models.BooleanField(default=True)
+    can_manage_other_moderators = models.BooleanField(
+        default=False,
+        help_text="Only senior moderators can manage other moderators"
+    )
+    
+    class Meta:
+        verbose_name = "moderator"
+        verbose_name_plural = "moderators"
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"Moderator: {self.user.username}"
+    
+    def save(self, *args, **kwargs):
+        """Ensure moderator user has moderator role."""
+        if self.user.role != User.Role.MODERATOR:
+            self.user.role = User.Role.MODERATOR
+            self.user.save()
+        super().save(*args, **kwargs)
