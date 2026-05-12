@@ -1,0 +1,29 @@
+{% load static %}
+
+{% if content_type == 'article' %}
+    <!-- Article Like Button -->
+    <button class="btn btn-sm {% if liked %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            hx-post="{% url 'interactions:like_article' object.pk %}"
+            hx-target="#like-button-{{ object.pk }}"
+            hx-swap="outerHTML"
+            hx-indicator="#loading-{{ object.pk }}">
+        <i class="bi bi-heart{% if liked %}-fill{% endif %}"></i>
+        <span class="ms-1">{{ like_count }}</span>
+    </button>
+    <div id="loading-{{ object.pk }}" class="htmx-indicator d-none">
+        <i class="bi bi-arrow-clockwise bi-spin"></i>
+    </div>
+{% elif content_type == 'comment' %}
+    <!-- Comment Like Button -->
+    <button class="btn btn-sm {% if liked %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            hx-post="{% url 'interactions:like_comment' object.pk %}"
+            hx-target="#comment-like-{{ object.pk }}"
+            hx-swap="outerHTML"
+            hx-indicator="#comment-loading-{{ object.pk }}">
+        <i class="bi bi-heart{% if liked %}-fill{% endif %}"></i>
+        <span class="ms-1">{{ like_count }}</span>
+    </button>
+    <div id="comment-loading-{{ object.pk }}" class="htmx-indicator d-none">
+        <i class="bi bi-arrow-clockwise bi-spin"></i>
+    </div>
+{% endif %}

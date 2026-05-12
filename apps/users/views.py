@@ -1,8 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 from django.db.models import Count, Q
-from .models import User, UserProfile
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import ListView
+from .models import User, UserProfile, Follow
 from apps.blog.models import Article
 from apps.interactions.models import Like, SavedArticle, ArticleView
 from apps.taxonomy.models import Category
@@ -24,17 +28,17 @@ def profile_view(request):
     # Articles récents de l'utilisateur
     user_articles = Article.objects.filter(
         author=request.user
-    ).select_related('category').order_by('-created_at')[:5]
+    ).prefetch_related('categories').order_by('-created_at')[:5]
     
     # Articles aimés récemment
     liked_articles = Article.objects.filter(
         likes__user=request.user
-    ).select_related('author', 'category').order_by('-likes__created_at')[:5]
+    ).select_related('author').prefetch_related('categories').order_by('-likes__created_at')[:5]
     
     # Articles sauvegardés
     saved_articles = Article.objects.filter(
         saves__user=request.user
-    ).select_related('author', 'category').order_by('-saves__created_at')[:5]
+    ).select_related('author').prefetch_related('categories').order_by('-saves__created_at')[:5]
     
     context = {
         'profile': profile,
@@ -141,9 +145,113 @@ def signup_view(request):
     
     # Utiliser la vue signup avec notre contexte
     response = signup_view_class(request)
-    
     # Si c'est une réponse de formulaire (GET après POST échoué), ajouter les catégories
     if response.status_code == 200 and hasattr(response, 'context_data'):
         response.context_data['categories'] = categories
     
     return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def follow_user(request, user_id):
+    """Follow or unfollow a user using HTMX."""
+    user_to_follow = get_object_or_404(User, pk=user_id)
+    
+    if user_to_follow == request.user:
+        return JsonResponse({'error': 'You cannot follow yourself.'}, status=400)
+    
+    follow, created = Follow.objects.get_or_create(
+        follower=request.user,
+        following=user_to_follow
+    )
+    
+    if created:
+        message = f"You are now following {user_to_follow.username}"
+        following = True
+    else:
+        follow.delete()
+        message = f"You have unfollowed {user_to_follow.username}"
+        following = False
+    
+    # Return HTMX response
+    if request.headers.get('HX-Request'):
+        from django.template.loader import render_to_string
+        html = render_to_string('users/partials/follow_button.html', {
+            'user': user_to_follow,
+            'following': following
+        })
+        return JsonResponse({
+            'html': html,
+            'message': message,
+            'following': following,
+            'followers_count': user_to_follow.followers.count()
+        })
+    
+    return JsonResponse({'success': True, 'message': message})
+
+
+class FollowingListView(LoginRequiredMixin, ListView):
+    """List of users that the current user follows."""
+    model = Follow
+    template_name = 'users/following.html'
+    context_object_name = 'follows'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return Follow.objects.filter(
+            follower=self.request.user
+        ).select_related('following').order_by('-created_at')
+
+
+class FollowersListView(LoginRequiredMixin, ListView):
+    """List of users that follow the current user."""
+    model = Follow
+    template_name = 'users/followers.html'
+    context_object_name = 'follows'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return Follow.objects.filter(
+            following=self.request.user
+        ).select_related('follower').order_by('-created_at')
+
+
+@login_required
+def user_profile(request, username):
+    """View another user's profile."""
+    user = get_object_or_404(User, username=username)
+    profile = get_object_or_404(UserProfile, user=user)
+    
+    # Check if current user follows this user
+    is_following = False
+    if request.user.is_authenticated:
+        is_following = Follow.objects.filter(
+            follower=request.user,
+            following=user
+        ).exists()
+    
+    # Get user's articles
+    articles = Article.objects.filter(
+        author=user,
+        status='published'
+    ).select_related('author').order_by('-created_at')
+    
+    context = {
+        'profile_user': user,
+        'profile': profile,
+        'articles': articles,
+        'is_following': is_following,
+        'followers_count': user.followers.count(),
+        'following_count': user.following.count()
+    }
+    
+    return render(request, 'users/user_profile.html', context)
+
+
+@login_required
+def logout_view(request):
+    """Custom styled logout view."""
+    from django.contrib.auth import logout
+    logout(request)
+    return render(request, 'account/logout.html')

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Inscription - Smart Blog AI{% endblock %}
+{% block title %}Sign Up - {{ site_name }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -9,23 +9,26 @@
         <div class="card shadow">
             <div class="card-header bg-primary text-white text-center">
                 <h3 class="mb-0">
-                    <i class="bi bi-robot"></i> Rejoindre Smart Blog AI
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
+                    Join {{ site_name }}
                 </h3>
-                <p class="mb-0 mt-2">Créez votre compte et recevez des recommandations personnalisées</p>
+                <p class="mb-0 mt-2">Create your account and get personalized recommendations</p>
             </div>
             <div class="card-body">
                 <form method="post" id="signup-form">
                     {% csrf_token %}
 
-                    <!-- Étape 1: Informations de base -->
+                    <!-- Step 1: Basic Information -->
                     <div id="step1" class="signup-step">
                         <h5 class="mb-4">
-                            <span class="badge bg-primary">1</span> Informations personnelles
+                            <span class="badge bg-primary">1</span> Personal Information
                         </h5>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="id_username" class="form-label">Nom d'utilisateur</label>
+                                <label for="id_username" class="form-label">Username</label>
                                 <input type="text" class="form-control" id="id_username" name="username" required>
                                 {% if form.username.errors %}
                                 <div class="text-danger small">{{ form.username.errors }}</div>
@@ -42,14 +45,14 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="id_password1" class="form-label">Mot de passe</label>
+                                <label for="id_password1" class="form-label">Password</label>
                                 <input type="password" class="form-control" id="id_password1" name="password1" required>
                                 {% if form.password1.errors %}
                                 <div class="text-danger small">{{ form.password1.errors }}</div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="id_password2" class="form-label">Confirmer le mot de passe</label>
+                                <label for="id_password2" class="form-label">Confirm Password</label>
                                 <input type="password" class="form-control" id="id_password2" name="password2" required>
                                 {% if form.password2.errors %}
                                 <div class="text-danger small">{{ form.password2.errors }}</div>
@@ -59,41 +62,55 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="first_name" class="form-label">Prénom</label>
+                                <label for="first_name" class="form-label">First Name</label>
                                 <input type="text" class="form-control" id="first_name" name="first_name" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="last_name" class="form-label">Nom</label>
+                                <label for="last_name" class="form-label">Last Name</label>
                                 <input type="text" class="form-control" id="last_name" name="last_name" required>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="bio" class="form-label">Bio (optionnel)</label>
+                            <label for="bio" class="form-label">Bio (optional)</label>
                             <textarea class="form-control" id="bio" name="bio" rows="2"
-                                placeholder="Parlez-nous un peu de vous..."></textarea>
+                                placeholder="Tell us a little about yourself..."></textarea>
                         </div>
 
                         <div class="text-end">
                             <button type="button" class="btn btn-primary" onclick="nextStep()">
-                                Suivant <i class="bi bi-arrow-right"></i>
+                                Next <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Étape 2: Préférences de contenu -->
+                    <!-- Step 2: Content Preferences -->
                     <div id="step2" class="signup-step" style="display: none;">
                         <h5 class="mb-4">
-                            <span class="badge bg-primary">2</span> Vos centres d'intérêt
+                            <span class="badge bg-primary">2</span> Your Interests
                         </h5>
                         <p class="text-muted mb-4">
-                            Sélectionnez les catégories qui vous intéressent. Notre IA vous recommandera les meilleurs
-                            articles
-                            dans ces domaines.
+                            Select the categories that interest you. Our AI will recommend the best
+                            articles in these areas.
                         </p>
 
+                            <div class="mb-4">
+                            <label class="form-label">Account Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="role" id="role_user" value="user" checked>
+                                <label class="form-check-label" for="role_user">
+                                    Regular User
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="role" id="role_author" value="author">
+                                <label class="form-check-label" for="role_author">
+                                    Author
+                                </label>
+                            </div>
+                            <small class="text-muted">Choose your account type. Authors can publish articles once approved by an admin.</small>
+                        </div>
                         <div class="row">
-                            <!-- Debug: {{ categories|length }} catégories trouvées -->
                             {% for category in categories %}
                             <div class="col-md-6 col-lg-4 mb-3">
                                 <div class="card category-card h-100" data-category="{{ category.id }}">
@@ -103,32 +120,30 @@
                                                 value="{{ category.id }}" id="cat_{{ category.id }}">
                                             <label class="form-check-label w-100" for="cat_{{ category.id }}">
                                                 <h6 class="mb-1">{{ category.name }}</h6>
-                                                <small class="text-muted">{{ category.description|truncatewords:10
-                                                    }}</small>
+                                                <small class="text-muted">{{ category.description|truncatewords:10 }}</small>
                                             </label>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             {% empty %}
-                            <div class="col-12">
-                                <p class="text-muted">Aucune catégorie disponible pour le moment.</p>
+                            <div class="col-12" id="categories-empty-state">
+                                <p class="text-muted">No categories available at the moment.</p>
                             </div>
                             {% endfor %}
                         </div>
 
                         <div class="alert alert-info mt-3">
                             <i class="bi bi-info-circle"></i>
-                            <strong>Conseil :</strong> Sélectionnez au moins 3 catégories pour de meilleures
-                            recommandations.
+                            <strong>Tip:</strong> Select at least 3 categories for better recommendations.
                         </div>
 
                         <div class="d-flex justify-content-between">
                             <button type="button" class="btn btn-secondary" onclick="previousStep()">
-                                <i class="bi bi-arrow-left"></i> Précédent
+                                <i class="bi bi-arrow-left"></i> Previous
                             </button>
                             <button type="button" class="btn btn-primary" onclick="validateAndSubmit()">
-                                <i class="bi bi-check-circle"></i> Créer mon compte
+                                <i class="bi bi-check-circle"></i> Create Account
                             </button>
                         </div>
                     </div>
@@ -137,8 +152,8 @@
         </div>
 
         <div class="text-center mt-3">
-            <p>Vous avez déjà un compte ?
-                <a href="{% url 'account_login' %}" class="text-decoration-none">Connectez-vous</a>
+            <p>Already have an account?
+                <a href="{% url 'account_login' %}" class="text-decoration-none">Sign in</a>
             </p>
         </div>
     </div>
@@ -157,12 +172,12 @@
     }
 
     .category-card.selected {
-        border-color: #0d6efd;
+        border-color: var(--brand-primary);
         background-color: #f8f9ff;
     }
 
     .form-check-input:checked~.form-check-label h6 {
-        color: #0d6efd;
+        color: var(--brand-primary);
         font-weight: 600;
     }
 
@@ -184,8 +199,11 @@
 </style>
 
 <script>
+    let selectedCount = 0;
+    const maxSelections = 5;
+
     function nextStep() {
-        // Valider l'étape 1
+        // Validate step 1
         const username = document.getElementById('id_username').value;
         const email = document.getElementById('id_email').value;
         const password1 = document.getElementById('id_password1').value;
@@ -194,12 +212,12 @@
         const lastName = document.getElementById('last_name').value;
 
         if (!username || !email || !password1 || !password2 || !firstName || !lastName) {
-            alert('Veuillez remplir tous les champs obligatoires.');
+            alert('Please fill in all required fields.');
             return;
         }
 
         if (password1 !== password2) {
-            alert('Les mots de passe ne correspondent pas.');
+            alert('Passwords do not match.');
             return;
         }
 
@@ -216,35 +234,46 @@
         const selectedCategories = document.querySelectorAll('input[name="preferred_categories"]:checked');
 
         if (selectedCategories.length === 0) {
-            alert('Veuillez sélectionner au moins une catégorie.');
+            alert('Please select at least one category.');
             return;
         }
 
         if (selectedCategories.length < 3) {
-            const confirm = confirm('Nous recommandons de sélectionner au moins 3 catégories pour de meilleures recommandations. Voulez-vous continuer ?');
+            const confirm = window.confirm('We recommend selecting at least 3 categories for better recommendations. Do you want to continue?');
             if (!confirm) return;
         }
 
-        // Soumettre le formulaire
+        // Submit the form
         document.getElementById('signup-form').submit();
     }
 
-    // Gestion du clic sur les cartes de catégories
-    document.querySelectorAll('.category-card').forEach(card => {
-        card.addEventListener('click', function (e) {
-            if (e.target.type !== 'checkbox') {
-                const checkbox = this.querySelector('input[type="checkbox"]');
-                checkbox.checked = !checkbox.checked;
-                updateCardSelection(this);
-            }
-        });
+    function bindCategoryCards() {
+        document.querySelectorAll('.category-card').forEach(card => {
+            card.addEventListener('click', function (e) {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    const wasChecked = checkbox.checked;
 
-        // Mettre à jour le style quand la case change
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        checkbox.addEventListener('change', function () {
-            updateCardSelection(card);
+                    if (!wasChecked && selectedCount >= maxSelections) {
+                        alert(`You can select maximum ${maxSelections} categories.`);
+                        return;
+                    }
+
+                    checkbox.checked = !checkbox.checked;
+                    updateCardSelection(this);
+                    updateSelectedCount();
+                }
+            });
+
+            const checkbox = card.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', function () {
+                updateCardSelection(card);
+                updateSelectedCount();
+            });
         });
-    });
+    }
+
+    bindCategoryCards();
 
     function updateCardSelection(card) {
         const checkbox = card.querySelector('input[type="checkbox"]');
@@ -253,6 +282,10 @@
         } else {
             card.classList.remove('selected');
         }
+    }
+
+    function updateSelectedCount() {
+        selectedCount = document.querySelectorAll('input[name="preferred_categories"]:checked').length;
     }
 </script>
 {% endblock %}

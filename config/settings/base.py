@@ -58,6 +58,7 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 SITE_ID = 1
+SITE_NAME = "Blogora"
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [
@@ -87,6 +88,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.site_name",
+                "apps.blog.context_processors.navbar_counts",
             ],
         },
     },
@@ -95,19 +98,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ─── Database ────────────────────────────────────────────────────────────────
-# Configuration pour MySQL avec XAMPP (utilise PyMySQL pour éviter les dépendances système)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "blogora",
-        "USER": "root",
-        "PASSWORD": "",
-        "HOST": "localhost",
-        "PORT": "3306",
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+        "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
+        "NAME": env("DB_NAME", default=str(BASE_DIR / "db.sqlite3")),
+        "USER": env("DB_USER", default=""),
+        "PASSWORD": env("DB_PASSWORD", default=""),
+        "HOST": env("DB_HOST", default=""),
+        "PORT": env("DB_PORT", default=""),
     }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -131,6 +129,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_FORMS = {
+    'signup': 'apps.users.forms.CustomSignupForm',
+}
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
@@ -180,4 +181,109 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # ─── Email ───────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
-DEFAULT_FROM_EMAIL = env("EMAIL_HOST_USER", default="noreply@smartblog.ai")
+DEFAULT_FROM_EMAIL = env("EMAIL_HOST_USER", default="noreply@blogora.ai")
+
+# ─── Security Settings ───────────────────────────────────────────────────────
+# Security headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# Session security
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# File upload security
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+
+# Content Security Policy
+CSP_DEFAULT_SRC = "'self'"
+CSP_SCRIPT_SRC = "'self' 'unsafe-inline' 'unsafe-eval' https://cdn.ckeditor.com https://cdn.jsdelivr.net"
+CSP_STYLE_SRC = "'self' 'unsafe-inline' https://fonts.googleapis.com"
+CSP_FONT_SRC = "'self' https://fonts.gstatic.com"
+CSP_IMG_SRC = "'self' data: https:"
+CSP_CONNECT_SRC = "'self'"
+
+# ─── Performance Settings ─────────────────────────────────────────────────────
+# Database connection pooling
+DATABASE_CONNECTION_POOL_SIZE = 20
+DATABASE_CONNECTION_POOL_MAX_OVERFLOW = 10
+
+# Cache settings - disabled since Redis is not running
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+    }
+}
+
+# Session engine - using database sessions since Redis is not available
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# Template caching
+TEMPLATE_LOADERS = [
+    ('django.template.loaders.cached.Loader', [
+        'django.template.loaders.filesystem.Loader',
+        'django.template.loaders.app_directories.Loader',
+    ]),
+]
+
+# Database optimization (SQLite-specific)
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"]["OPTIONS"] = {
+        "timeout": 20,
+        "check_same_thread": False,
+    }
+
+# Logging for performance monitoring
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'blogora': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Likes - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">My Likes</h1>
+            <p class="text-muted mb-0">Articles and comments you've liked</p>
+        </div>
+        <a href="{% url 'users:profile' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Profile
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Liked Articles -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-heart-fill text-danger"></i> 
+                        Liked Articles ({{ articles|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if articles %}
+                    <div class="list-group list-group-flush">
+                        {% for article in articles %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        <a href="{{ article.get_absolute_url }}" class="text-decoration-none">
+                                            {{ article.title|truncatechars:40 }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">
+                                        by {{ article.author.username }} • {{ article.created_at|date:"M d, Y" }}
+                                    </small>
+                                </div>
+                                <small class="text-muted">
+                                    {{ article.like_count }} likes
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-heart fs-1"></i>
+                        <p class="mb-0 mt-2">You haven't liked any articles yet.</p>
+                        <a href="{% url 'blog:article_list' %}" class="btn btn-primary">
+                            Explore Articles
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Liked Comments -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-heart-fill text-danger"></i> 
+                        Liked Comments ({{ comments|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if comments %}
+                    <div class="list-group list-group-flush">
+                        {% for comment in comments %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <p class="mb-1">
+                                        <a href="{{ comment.article.get_absolute_url }}#comment-{{ comment.pk }}" class="text-decoration-none">
+                                            {{ comment.content|truncatechars:60 }}
+                                        </a>
+                                    </p>
+                                    <small class="text-muted">
+                                        on "{{ comment.article.title|truncatechars:30 }}" • 
+                                        by {{ comment.author.username }} • {{ comment.created_at|date:"M d, Y" }}
+                                    </small>
+                                </div>
+                                <small class="text-muted">
+                                    {{ comment.like_count }} likes
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-chat-dots fs-1"></i>
+                        <p class="mb-0 mt-2">You haven't liked any comments yet.</p>
+                        <a href="{% url 'blog:article_list' %}" class="btn btn-primary">
+                            Explore Articles
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .card-header {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+    }
+    
+    .list-group-item {
+        border: none;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
+{% endblock %}

@@ -1,0 +1,16 @@
+{% load static %}
+
+<button class="btn btn-sm {% if following %}btn-secondary{% else %}btn-primary{% endif %}"
+        hx-post="{% url 'users:follow_user' user.pk %}"
+        hx-target="#follow-btn-{{ user.pk }}"
+        hx-swap="outerHTML"
+        hx-indicator="#follow-loading-{{ user.pk }}">
+    {% if following %}
+        <i class="bi bi-person-check"></i> Following
+    {% else %}
+        <i class="bi bi-person-plus"></i> Follow
+    {% endif %}
+</button>
+<div id="follow-loading-{{ user.pk }}" class="htmx-indicator d-none">
+    <i class="bi bi-arrow-clockwise bi-spin"></i>
+</div>

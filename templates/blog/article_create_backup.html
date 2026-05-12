@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Article - {{ site_name }}{% endblock %}
+
+{% block extra_css %}
+<!-- Include CKEditor 5 CSS -->
+<link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/39.0.0/ckeditor.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Left Panel (70%) -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h4 class="mb-0">Write Your Article</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" id="article-form">
+                        {% csrf_token %}
+                        
+                        <!-- Title Input -->
+                        <div class="mb-4">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fs-5 fw-bold">Article Title</label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.title.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Choose a compelling title that captures readers' attention</small>
+                        </div>
+
+                        <!-- Rich Text Editor -->
+                        <div class="mb-4">
+                            <label for="{{ form.content.id_for_label }}" class="form-label fs-5 fw-bold">Content</label>
+                            {{ form.content }}
+                            {% if form.content.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.content.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Write your article content. Use the toolbar to format text, add links, images, and more.</small>
+                        </div>
+
+                        <!-- Categories Multi-select -->
+                        <div class="mb-4">
+                            <label for="{{ form.categories.id_for_label }}" class="form-label fw-bold">Categories</label>
+                            <div class="position-relative">
+                                <select class="form-select" id="category-select" multiple>
+                                    {% for category in form.categories.queryset %}
+                                        <option value="{{ category.pk }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                {{ form.categories }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary position-absolute"
+                                        style="top: 50%; right: 10px; transform: translateY(-50%);"
+                                        onclick="toggleCategoryDropdown()">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                            {% if form.categories.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.categories.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Select relevant categories to help readers discover your article.</small>
+                        </div>
+
+                        <!-- Tags Input -->
+                        <div class="mb-4">
+                            <label for="{{ form.tags.id_for_label }}" class="form-label fw-bold">Tags</label>
+                            <div class="position-relative">
+                                <div class="border rounded p-2 mb-2">
+                                    <div id="selected-tags" class="d-flex flex-wrap gap-1 mb-2"></div>
+                                    <div class="input-group">
+                                        <input type="text" id="tag-input"
+                                               placeholder="Type to search tags..."
+                                               class="form-control border-end-0"
+                                               autocomplete="off">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="toggleTagSuggestions()">
+                                            <i class="bi bi-tags"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="tag-suggestions" class="position-absolute w-100 bg-white border rounded shadow-sm"
+                                     style="top: 100%; z-index: 1000; display: none; max-height: 200px; overflow-y: auto;">
+                                    <!-- Tag suggestions will be populated here -->
+                                </div>
+                                {{ form.tags }}
+                            </div>
+                            {% if form.tags.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.tags.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Add up to 10 relevant tags to improve discoverability.</small>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="button" class="btn btn-outline-primary" onclick="previewArticle()">
+                                <i class="bi bi-eye"></i> Preview
+                            </button>
+                            <button type="submit" name="action" value="save_draft" class="btn btn-secondary">
+                                <i class="bi bi-save"></i> Save Draft
+                            </button>
+                            <button type="submit" name="action" value="submit_review" class="btn btn-primary">
+                                <i class="bi bi-send"></i> Submit for Review
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel (30%) -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">Publish Settings</h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Cover Image Upload -->
+                    <div class="mb-4">
+                        <label for="{{ form.cover_image.id_for_label }}" class="form-label fw-bold">Cover Image</label>
+                        {{ form.cover_image }}
+                        {% if form.cover_image.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.cover_image.errors %}
+                                    <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Upload a compelling cover image (recommended: 1200x630px)</small>
+                    </div>
+
+                    <!-- Status Selection -->
+                    <div class="mb-4">
+                        <label for="{{ form.status.id_for_label }}" class="form-label fw-bold">Status</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.status.errors %}
+                                    <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Choose the publication status for your article</small>
+                    </div>
+
+                    <!-- SEO Settings -->
+                    <div class="mb-4">
+                        <label for="{{ form.meta_description.id_for_label }}" class="form-label fw-bold">Meta Description</label>
+                        {{ form.meta_description }}
+                        {% if form.meta_description.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.meta_description.errors %}
+                                    <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Brief description for search engines (150-160 characters)</small>
+                    </div>
+
+                    <!-- Reading Time Estimation -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-clock me-2"></i>
+                            <span id="reading-time">1 min read</span>
+                        </div>
+                        <small class="text-muted">Estimated reading time based on content length</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include CKEditor 5 JavaScript -->
+<script src="https://cdn.ckeditor.com/ckeditor5/39.0.0/ckeditor.js"></script>
+
+<script>
+let editor;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize CKEditor
+    ClassicEditor
+        .create(document.querySelector('#{{ form.content.id_for_label }}'), {
+            toolbar: {
+                items: [
+                    'heading', '|',
+                    'bold', 'italic', 'underline', 'strikethrough', '|',
+                    'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+                    'link', 'blockquote', 'codeBlock', '|',
+                    'uploadImage', 'insertTable', 'horizontalLine', '|',
+                    'undo', 'redo', '|',
+                    'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+                    'highlight', '|',
+                    'alignment', '|',
+                    'mediaEmbed', 'htmlEmbed'
+                ]
+            },
+            heading: {
+                options: [
+                    { model: 'paragraph', title: 'Paragraph' },
+                    { model: 'heading1', title: 'Heading 1' },
+                    { model: 'heading2', title: 'Heading 2' },
+                    { model: 'heading3', title: 'Heading 3' },
+                    { model: 'heading4', title: 'Heading 4' }
+                ]
+            },
+            image: {
+                toolbar: [ 'imageTextAlternative', 'imageStyle:full', 'imageStyle:side', 'link', '|', 'uploadImage' ],
+                styles: [
+                    'full',
+                    'side',
+                    'alignLeft',
+                    'alignCenter',
+                    'alignRight'
+                ]
+            },
+            mediaEmbed: {
+                toolbar: [ 'mediaEmbed', '|', 'htmlEmbed' ],
+                previewsInData: true
+            },
+            table: {
+                contentToolbar: [ 'tableColumn', 'tableRow', 'mergeTableCells' ],
+                tableToolbar: [ 'bold', 'italic', 'underline', '|', 'tableProperties', '|', 'tableCellProperties' ]
+            }
+        })
+        .then(newEditor => {
+            editor = newEditor;
+            
+            // Update reading time when content changes
+            editor.model.document.on('change:data', updateReadingTime);
+            
+            // Initial reading time calculation
+            updateReadingTime();
+        })
+        .catch(error => {
+            console.error('CKEditor initialization error:', error);
+        });
+
+    // Initialize category and tag functionality
+    initializeCategorySelection();
+    initializeTagSelection();
+});
+
+function updateReadingTime() {
+    if (!editor) return;
+    
+    const content = editor.getData();
+    const textContent = content.replace(/<[^>]*>/g, ''); // Remove HTML tags
+    const wordCount = textContent.split(/\s+/).filter(word => word.length > 0).length;
+    const readingTime = Math.max(1, Math.ceil(wordCount / 200)); // 200 words per minute
+    
+    document.getElementById('reading-time').textContent = `${readingTime} min read`;
+}
+
+function initializeCategorySelection() {
+    const categorySelect = document.getElementById('category-select');
+    const hiddenCategories = document.querySelector('[name="categories"]');
+    
+    if (categorySelect && hiddenCategories) {
+        // Make select multiple and searchable
+        categorySelect.multiple = true;
+        categorySelect.size = 4;
+        
+        // Handle selection changes
+        categorySelect.addEventListener('change', function() {
+            const selectedOptions = Array.from(this.selectedOptions);
+            const selectedValues = selectedOptions.map(option => option.value);
+            hiddenCategories.value = selectedValues.join(',');
+        });
+    }
+}
+
+function initializeTagSelection() {
+    const tagInput = document.getElementById('tag-input');
+    const tagSuggestions = document.getElementById('tag-suggestions');
+    const selectedTagsContainer = document.getElementById('selected-tags');
+    const hiddenTags = document.querySelector('[name="tags"]');
+    
+    let selectedTags = [];
+    
+    // Tag input event listeners
+    tagInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length >= 2) {
+            fetchTagSuggestions(query);
+        } else {
+            tagSuggestions.style.display = 'none';
+        }
+    });
+    
+    tagInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const tag = this.value.trim();
+            if (tag && selectedTags.length < 10) {
+                addTag(tag);
+                this.value = '';
+                tagSuggestions.style.display = 'none';
+            }
+        }
+    });
+    
+    // Add tag function
+    window.addTag = function(tagName) {
+        if (selectedTags.length >= 10) {
+            alert('Maximum 10 tags allowed');
+            return;
+        }
+        
+        if (!selectedTags.includes(tagName)) {
+            selectedTags.push(tagName);
+            renderSelectedTags();
+            updateHiddenTags();
+        }
+        
+        tagInput.value = '';
+        tagSuggestions.style.display = 'none';
+    };
+    
+    // Remove tag function
+    window.removeTag = function(tagName) {
+        selectedTags = selectedTags.filter(tag => tag !== tagName);
+        renderSelectedTags();
+        updateHiddenTags();
+    };
+    
+    // Render selected tags
+    function renderSelectedTags() {
+        selectedTagsContainer.innerHTML = selectedTags.map(tag => `
+            <span class="badge bg-primary d-flex align-items-center">
+                ${tag}
+                <button type="button" class="btn btn-sm btn-link text-white p-0 ms-1" onclick="removeTag('${tag}')">
+                    <i class="bi bi-x"></i>
+                </button>
+            </span>
+        `).join('');
+    }
+    
+    // Update hidden tags field
+    function updateHiddenTags() {
+        if (hiddenTags) {
+            hiddenTags.value = selectedTags.join(',');
+        }
+    }
+    
+    // Fetch tag suggestions
+    function fetchTagSuggestions(query) {
+        fetch(`/api/tags/search/?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.tags && data.tags.length > 0) {
+                    tagSuggestions.innerHTML = data.tags.map(tag => `
+                        <div class="p-2 border-bottom cursor-pointer hover-bg-light" onclick="addTag('${tag.name}')" style="cursor: pointer;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>${tag.name}</span>
+                                <small class="text-muted">${tag.count} articles</small>
+                            </div>
+                        </div>
+                    `).join('');
+                    tagSuggestions.style.display = 'block';
+                } else {
+                    tagSuggestions.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching tags:', error);
+                tagSuggestions.style.display = 'none';
+            });
+    }
+    
+    // Toggle tag suggestions
+    window.toggleTagSuggestions = function() {
+        if (tagSuggestions.style.display === 'block') {
+            tagSuggestions.style.display = 'none';
+        } else {
+            const query = tagInput.value.trim();
+            if (query.length >= 2) {
+                fetchTagSuggestions(query);
+            }
+        }
+    };
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!tagInput.contains(e.target) && !tagSuggestions.contains(e.target)) {
+            tagSuggestions.style.display = 'none';
+        }
+    });
+}
+
+function toggleCategoryDropdown() {
+    const categorySelect = document.getElementById('category-select');
+    if (categorySelect.style.display === 'none') {
+        categorySelect.style.display = 'block';
+    } else {
+        categorySelect.style.display = 'none';
+    }
+}
+
+function previewArticle() {
+    const form = document.getElementById('article-form');
+    const title = form.querySelector('[name="title"]').value;
+    const content = editor.getData();
+    const status = form.querySelector('[name="status"]').value;
+
+    const params = new URLSearchParams({
+        title: title,
+        content: content,
+        status: status
+    });
+
+    window.open(`{% url 'blog:preview' %}?${encodeURI(params.toString())}`, '_blank');
+}
+
+// Form submission with CKEditor content sync
+document.getElementById('article-form').addEventListener('submit', function(e) {
+    if (editor) {
+        // Sync CKEditor content to the hidden textarea
+        const contentField = document.querySelector('[name="content"]');
+        if (contentField) {
+            contentField.value = editor.getData();
+        }
+    }
+});
+</script>
+{% endblock %}

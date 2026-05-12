@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_filters %}
+
+{% block title %}{{ article.title }} - {{ site_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.article-content {
+    line-height: 1.6;
+}
+.article-content h1, .article-content h2, .article-content h3 {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+.article-content p {
+    margin-bottom: 1rem;
+}
+.reaction-btn {
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+.reaction-btn:hover {
+    background-color: #f8f9fa;
+}
+.reaction-btn.active {
+    background-color: #e3f2fd;
+}
+.interaction-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+}
+.interaction-btn:hover {
+    background-color: #f8f9fa;
+}
+.interaction-btn.active {
+    color: #007bff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Article Header -->
+            <header class="mb-4">
+                <div class="d-flex align-items-center mb-3">
+                    <img src="{{ article.author.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                         class="rounded-circle me-3" width="40" height="40" alt="{{ article.author.username }}">
+                    <div>
+                        <h6 class="mb-0">{{ article.author.get_full_name|default:article.author.username }}</h6>
+                        <small class="text-muted">
+                            {{ article.created_at|date:"M d, Y" }} • 
+                            {{ article.reading_time|default:"1 min read" }}
+                        </small>
+                    </div>
+                </div>
+
+                <h1 class="display-5 mb-3">{{ article.title }}</h1>
+                
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="badge bg-{{ article.status|status_color }}">
+                        {{ article.get_status_display }}
+                    </span>
+                    
+                    {% if article.categories.exists %}
+                    <div class="d-flex gap-1">
+                        {% for category in article.categories.all %}
+                        <a href="{% url 'blog:category' category.slug %}" 
+                           class="badge bg-secondary text-decoration-none">
+                            {{ category.name }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if article.cover_image %}
+                <div class="mb-4">
+                    <img src="{{ article.cover_image.url }}" class="img-fluid rounded" alt="{{ article.title }}">
+                </div>
+                {% endif %}
+            </header>
+
+            <!-- Article Content -->
+            <article class="article-content mb-5">
+                {{ article.content|safe }}
+            </article>
+
+            <!-- Article Interactions -->
+            <section class="mb-5">
+                <div class="card border">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <!-- Reactions -->
+                            <div class="col-md-6">
+                                <div class="d-flex gap-2 align-items-center">
+                                    <span class="text-muted me-2">React:</span>
+                                    {% for reaction_type in article.reactions_types %}
+                                    <button class="reaction-btn" 
+                                            data-reaction="{{ reaction_type }}"
+                                            onclick="toggleReaction('{{ reaction_type }}')"
+                                            title="{{ reaction_type|title }}">
+                                        {{ reaction_type|emoji }}
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Like and Save -->
+                            <div class="col-md-6 text-end">
+                                <div class="d-flex gap-3 justify-content-end align-items-center">
+                                    <button class="interaction-btn" id="like-btn-{{ article.id }}" 
+                                            onclick="toggleLike({{ article.id }})">
+                                        <i class="bi bi-heart"></i>
+                                        <span id="like-count-{{ article.id }}">{{ article.likes_count }}</span>
+                                    </button>
+                                    
+                                    <button class="interaction-btn" id="save-btn-{{ article.id }}" 
+                                            onclick="toggleSave({{ article.id }})">
+                                        <i class="bi bi-bookmark"></i>
+                                        <span id="save-count-{{ article.id }}">{{ article.saves_count }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reaction Counts -->
+                        <div class="mt-3">
+                            <div class="d-flex gap-3 flex-wrap" id="reaction-counts">
+                                {% for reaction_type, count in article.reaction_counts.items %}
+                                {% if count > 0 %}
+                                <span class="badge bg-light text-dark">
+                                    {{ reaction_type|emoji }} {{ count }}
+                                </span>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tags -->
+            {% if article.tags.exists %}
+            <section class="mb-5">
+                <h5 class="mb-3">Tags</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    {% for tag in article.tags.all %}
+                    <a href="{% url 'blog:tag' tag.slug %}" 
+                       class="badge bg-primary text-decoration-none">
+                        {{ tag.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Comments Section -->
+            <section class="mt-5">
+                <h3 class="mb-4">
+                    <i class="bi bi-chat-dots"></i> Comments ({{ article.comments.count }})
+                </h3>
+
+                {% if user.is_authenticated %}
+                <!-- Comment Form -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <form method="post" action="{% url 'comments:create_comment' article.id %}" 
+                              hx-post="{% url 'comments:create_comment' article.id %}"
+                              hx-target="#comments-container"
+                              hx-swap="beforebegin">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <textarea name="content" class="form-control" rows="3" 
+                                          placeholder="Share your thoughts..." required minlength="10"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send"></i> Post Comment
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Comments List -->
+                <div id="comments-container">
+                    {% for comment in article.comments.all %}
+                    <div class="card mb-3" id="comment-{{ comment.id }}">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start">
+                                <img src="{{ comment.author.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                                     class="rounded-circle me-3" width="40" height="40" alt="{{ comment.author.username }}">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">{{ comment.author.get_full_name|default:comment.author.username }}</h6>
+                                        <small class="text-muted">{{ comment.created_at|date:"M d, Y H:i" }}</small>
+                                    </div>
+                                    <p class="mb-2">{{ comment.content }}</p>
+                                    
+                                    <div class="d-flex gap-3 align-items-center">
+                                        <button class="btn btn-sm btn-outline-danger" type="button"
+                                                onclick="toggleCommentLike({{ comment.id }})">
+                                            <i class="bi bi-heart{% if comment.liked %}-fill{% endif %}"></i>
+                                            <span class="ms-1">{{ comment.likes_count }}</span>
+                                        </button>
+                                        
+                                        {% if user.is_authenticated %}
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                                onclick="showReplyForm({{ comment.id }})">
+                                            <i class="bi bi-reply"></i> Reply
+                                        </button>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Reply Form -->
+                                    {% if user.is_authenticated %}
+                                    <div class="mt-3" id="reply-form-{{ comment.id }}" style="display: none;">
+                                        <form method="post" action="{% url 'comments:comment_create' article.id %}" 
+                                              class="border rounded p-3 bg-light">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                                            <div class="mb-3">
+                                                <textarea name="content" class="form-control" rows="2"
+                                                          placeholder="Your reply..." required minlength="10"></textarea>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="submit" class="btn btn-primary btn-sm">Reply</button>
+                                                <button type="button" class="btn btn-secondary btn-sm"
+                                                        onclick="hideReplyForm({{ comment.id }})">Cancel</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    {% endif %}
+
+                                    <!-- Replies -->
+                                    {% for reply in comment.replies.all %}
+                                    <div class="mt-3 ms-4 p-3 border rounded bg-light">
+                                        <div class="d-flex align-items-start">
+                                            <img src="{{ reply.author.profile_picture.url|default:'/static/images/default-avatar.png' }}" 
+                                                 class="rounded-circle me-2" width="30" height="30" alt="{{ reply.author.username }}">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <h6 class="mb-0 small">{{ reply.author.get_full_name|default:reply.author.username }}</h6>
+                                                    <small class="text-muted">{{ reply.created_at|date:"M d, Y H:i" }}</small>
+                                                </div>
+                                                <p class="mb-0 small">{{ reply.content }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-chat-dots display-4 text-muted"></i>
+                        <h5 class="mt-3">No comments yet</h5>
+                        <p class="text-muted">Be the first to share your thoughts!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- Similar Articles -->
+{% if similar_articles %}
+<section class="mt-5">
+    <div class="container">
+        <h3 class="mb-4">Similar Articles</h3>
+        <div class="row">
+            {% for similar in similar_articles %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    {% if similar.cover_image %}
+                    <img src="{{ similar.cover_image.url }}" class="card-img-top" alt="{{ similar.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <a href="{{ similar.get_absolute_url }}" class="text-decoration-none">
+                                {{ similar.title }}
+                            </a>
+                        </h6>
+                        <p class="card-text text-muted small">{{ similar.content|striptags|truncatewords:15 }}</p>
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> {{ similar.reading_time|default:"1 min" }} •
+                            <i class="bi bi-eye"></i> {{ similar.view_count }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let articleData = {
+    id: {{ article.id }},
+    liked: {{ article.liked|yesno:"true,false" }},
+    saved: {{ article.saved|yesno:"true,false" }},
+    likes_count: {{ article.likes_count }},
+    saves_count: {{ article.saves_count }},
+    reactions: {{ article.reactions_json|safe }},
+    user_reactions: {{ article.user_reactions|safe }}
+};
+
+// Load initial interaction data
+document.addEventListener('DOMContentLoaded', function() {
+    updateInteractionButtons();
+    updateReactionButtons();
+});
+
+function updateInteractionButtons() {
+    // Update like button
+    const likeBtn = document.getElementById(`like-btn-${articleData.id}`);
+    if (likeBtn) {
+        const icon = likeBtn.querySelector('i');
+        const count = likeBtn.querySelector('span');
+        
+        if (articleData.liked) {
+            icon.classList.remove('bi-heart');
+            icon.classList.add('bi-heart-fill');
+            likeBtn.classList.add('active');
+        } else {
+            icon.classList.remove('bi-heart-fill');
+            icon.classList.add('bi-heart');
+            likeBtn.classList.remove('active');
+        }
+        
+        count.textContent = articleData.likes_count;
+    }
+    
+    // Update save button
+    const saveBtn = document.getElementById(`save-btn-${articleData.id}`);
+    if (saveBtn) {
+        const icon = saveBtn.querySelector('i');
+        const count = saveBtn.querySelector('span');
+        
+        if (articleData.saved) {
+            icon.classList.remove('bi-bookmark');
+            icon.classList.add('bi-bookmark-fill');
+            saveBtn.classList.add('active');
+        } else {
+            icon.classList.remove('bi-bookmark-fill');
+            icon.classList.add('bi-bookmark');
+            saveBtn.classList.remove('active');
+        }
+        
+        count.textContent = articleData.saves_count;
+    }
+}
+
+function updateReactionButtons() {
+    // Update reaction button states
+    articleData.user_reactions.forEach(reaction => {
+        const btn = document.querySelector(`[data-reaction="${reaction}"]`);
+        if (btn) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Update reaction counts display
+    const countsContainer = document.getElementById('reaction-counts');
+    if (countsContainer) {
+        countsContainer.innerHTML = '';
+        Object.entries(articleData.reactions).forEach(([type, count]) => {
+            if (count > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-light text-dark';
+                badge.innerHTML = `${getReactionEmoji(type)} ${count}`;
+                countsContainer.appendChild(badge);
+            }
+        });
+    }
+}
+
+function getReactionEmoji(reactionType) {
+    const emojiMap = {
+        'love': '❤️',
+        'like': '👍',
+        'laugh': '😂',
+        'wow': '😮',
+        'sad': '😢',
+        'angry': '😠'
+    };
+    return emojiMap[reactionType] || '👍';
+}
+
+function toggleLike(articleId) {
+    fetch(`/interactions/like/article/${articleId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            articleData.liked = data.liked;
+            articleData.likes_count = data.like_count;
+            updateInteractionButtons();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function toggleSave(articleId) {
+    fetch(`/interactions/save/article/${articleId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            articleData.saved = data.saved;
+            articleData.saves_count = data.save_count;
+            updateInteractionButtons();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function toggleReaction(reactionType) {
+    fetch(`/interactions/reaction/${articleData.id}/${reactionType}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            articleData.reactions = data.reaction_counts;
+            articleData.user_reactions = data.user_reactions;
+            updateReactionButtons();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function toggleCommentLike(commentId) {
+    fetch(`/interactions/like/comment/${commentId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const commentElement = document.getElementById(`comment-${commentId}`);
+            const likeBtn = commentElement.querySelector('.btn-outline-danger');
+            const icon = likeBtn.querySelector('i');
+            const count = likeBtn.querySelector('span');
+            
+            if (data.liked) {
+                icon.classList.remove('bi-heart');
+                icon.classList.add('bi-heart-fill');
+            } else {
+                icon.classList.remove('bi-heart-fill');
+                icon.classList.add('bi-heart');
+            }
+            
+            count.textContent = data.like_count;
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function showReplyForm(commentId) {
+    const replyForm = document.getElementById(`reply-form-${commentId}`);
+    if (replyForm) {
+        replyForm.style.display = 'block';
+    }
+}
+
+function hideReplyForm(commentId) {
+    const replyForm = document.getElementById(`reply-form-${commentId}`);
+    if (replyForm) {
+        replyForm.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

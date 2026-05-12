@@ -58,15 +58,22 @@ class Reaction(TimeStampedModel):
 
 
 class Like(TimeStampedModel):
+    """Generic like model for articles and comments."""
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="likes")
-    article = models.ForeignKey("blog.Article", on_delete=models.CASCADE, related_name="likes")
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
 
     class Meta:
-        unique_together = ("user", "article")
-        verbose_name = "j'aime"
+        unique_together = ("user", "content_type", "object_id")
+        verbose_name = "like"
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
 
     def __str__(self):
-        return f"{self.user} ♥ {self.article}"
+        return f"{self.user} likes {self.content_object}"
 
 
 class SavedArticle(TimeStampedModel):

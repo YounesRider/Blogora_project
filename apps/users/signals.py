@@ -41,3 +41,21 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created and not hasattr(instance, '_profile_created'):
         UserProfile.objects.create(user=instance)
         instance._profile_created = True
+
+
+@receiver(post_save, sender=User)
+def create_default_collection(sender, instance, created, **kwargs):
+    """
+    Crée la collection par défaut 'Saved Posts' pour les nouveaux utilisateurs.
+    """
+    if created and not hasattr(instance, '_collection_created'):
+        from apps.core.models import Collection
+        Collection.objects.get_or_create(
+            owner=instance,
+            name="Saved Posts",
+            defaults={
+                'description': 'Your default collection for saved articles',
+                'is_private': True
+            }
+        )
+        instance._collection_created = True

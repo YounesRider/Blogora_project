@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Recommended for You - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Recommended for You</h1>
+            <p class="text-muted mb-0">Personalized article recommendations based on your interests</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'recommendations:settings' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear"></i> Settings
+            </a>
+            <button class="btn btn-primary"
+                    hx-post="{% url 'recommendations:refresh' %}"
+                    hx-target="#recommendations-container"
+                    hx-swap="innerHTML"
+                    hx-indicator="#refresh-loading">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="refresh-loading" class="htmx-indicator text-center d-none">
+        <i class="bi bi-arrow-clockwise bi-spin"></i> Generating recommendations...
+    </div>
+
+    <!-- Recommendations Container -->
+    <div id="recommendations-container">
+        {% if has_recommendations %}
+        <!-- Recommended Articles -->
+        <div class="row">
+            {% for article in page_obj %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    {% if article.cover_image %}
+                    <img src="{{ article.cover_image.url }}" class="card-img-top" alt="{{ article.title }}" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            {% for category in article.categories.all %}
+                            <span class="badge bg-primary me-1">{{ category.name }}</span>
+                            {% endfor %}
+                        </div>
+                        <h5 class="card-title">
+                            <a href="{{ article.get_absolute_url }}" class="text-decoration-none">
+                                {{ article.title|truncatechars:50 }}
+                            </a>
+                        </h5>
+                        <p class="card-text text-muted flex-grow-1">
+                            {{ article.content|striptags|truncatechars:100 }}
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ article.author.username }}
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> {{ article.reading_time }} min read
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2 mt-1 text-muted small">
+                            <span><i class="bi bi-heart"></i> {{ article.like_count|default:0 }}</span>
+                            <span><i class="bi bi-bookmark"></i> {{ article.save_count|default:0 }}</span>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-sm btn-outline-primary flex-grow-1"
+                                    onclick="window.location.href='{{ article.get_absolute_url }}'">
+                                <i class="bi bi-eye"></i> Read
+                            </button>
+                            <button id="like-btn-{{ article.id }}" class="btn btn-sm {% if article.id in user_liked_article_ids %}btn-primary active{% else %}btn-outline-primary{% endif %}"
+                                    onclick="toggleLike({{ article.id }})">
+                                <i class="bi bi-heart{% if article.id in user_liked_article_ids %}-fill{% endif %}"></i>
+                                <span id="like-count-{{ article.id }}">{{ article.like_count|default:0 }}</span>
+                            </button>
+                            <button id="save-btn-{{ article.id }}" class="btn btn-sm {% if article.id in user_saved_article_ids %}btn-success active{% else %}btn-outline-success{% endif %}"
+                                    onclick="toggleSave({{ article.id }})">
+                                <i class="bi bi-bookmark{% if article.id in user_saved_article_ids %}-fill{% endif %}"></i>
+                                <span id="save-count-{{ article.id }}">{{ article.save_count|default:0 }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="Recommendations pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1">
+                        <i class="bi bi-chevron-double-left"></i>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                </li>
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">
+                        <i class="bi bi-chevron-double-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Coldstart or Popular Articles -->
+        <div class="row">
+            {% for article in trending_articles %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    {% if article.cover_image %}
+                    <img src="{{ article.cover_image.url }}" class="card-img-top" alt="{{ article.title }}" style="height: 200px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <span class="badge bg-info me-1">Suggested</span>
+                        </div>
+                        <h5 class="card-title">
+                            <a href="{{ article.get_absolute_url }}" class="text-decoration-none">
+                                {{ article.title|truncatechars:50 }}
+                            </a>
+                        </h5>
+                        <p class="card-text text-muted flex-grow-1">
+                            {{ article.content|striptags|truncatechars:100 }}
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ article.author.username }}
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-heart"></i> {{ article.like_count }}
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2 mt-1 text-muted small">
+                            <span><i class="bi bi-heart"></i> {{ article.like_count|default:0 }}</span>
+                            <span><i class="bi bi-bookmark"></i> {{ article.save_count|default:0 }}</span>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-sm btn-outline-primary flex-grow-1"
+                                    onclick="window.location.href='{{ article.get_absolute_url }}'">
+                                <i class="bi bi-eye"></i> Read
+                            </button>
+                            <button id="like-btn-{{ article.id }}" class="btn btn-sm {% if article.id in user_liked_article_ids %}btn-primary active{% else %}btn-outline-primary{% endif %}"
+                                    onclick="toggleLike({{ article.id }})">
+                                <i class="bi bi-heart{% if article.id in user_liked_article_ids %}-fill{% endif %}"></i>
+                                <span id="like-count-{{ article.id }}">{{ article.like_count|default:0 }}</span>
+                            </button>
+                            <button id="save-btn-{{ article.id }}" class="btn btn-sm {% if article.id in user_saved_article_ids %}btn-success active{% else %}btn-outline-success{% endif %}"
+                                    onclick="toggleSave({{ article.id }})">
+                                <i class="bi bi-bookmark{% if article.id in user_saved_article_ids %}-fill{% endif %}"></i>
+                                <span id="save-count-{{ article.id }}">{{ article.save_count|default:0 }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Activity Sidebar -->
+    {% if recent_likes %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Your Recent Activity</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Articles you've recently liked:</p>
+                    <div class="list-group list-group-flush">
+                        {% for article in recent_likes %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ article.get_absolute_url }}" class="text-decoration-none">
+                                    {{ article.title|truncatechars:40 }}
+                                </a>
+                                <small class="text-muted d-block">
+                                    by {{ article.author.username }}
+                                </small>
+                            </div>
+                            <a href="{% url 'recommendations:similar' article.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-lightning"></i> Similar
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .card-img-top {
+        border-top-left-radius: var(--radius-md);
+        border-top-right-radius: var(--radius-md);
+    }
+    
+    .badge {
+        font-size: 0.75rem;
+    }
+</style>
+
+{% endblock %}

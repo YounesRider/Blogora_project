@@ -1,0 +1,16 @@
+{% load static %}
+
+<!-- Save Article Button -->
+<button class="btn btn-sm {% if saved %}btn-success{% else %}btn-outline-success{% endif %}"
+        hx-post="{% url 'interactions:save_article' article.pk %}"
+        hx-target="#save-button-{{ article.pk }}"
+        hx-swap="outerHTML"
+        hx-indicator="#save-loading-{{ article.pk }}">
+    <i class="bi bi-bookmark{% if saved %}-fill{% endif %}"></i>
+    <span class="ms-1">
+        {% if saved %}Saved{% else %}Save{% endif %}
+    </span>
+</button>
+<div id="save-loading-{{ article.pk }}" class="htmx-indicator d-none">
+    <i class="bi bi-arrow-clockwise bi-spin"></i>
+</div>

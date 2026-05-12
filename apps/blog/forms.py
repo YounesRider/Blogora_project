@@ -4,39 +4,33 @@ from apps.taxonomy.models import Category, Tag
 
 
 class ArticleCreateForm(forms.ModelForm):
-    """Formulaire de création d'article pour les utilisateurs."""
+    """Article creation form for users."""
     
     class Meta:
         model = Article
-        fields = ['title', 'excerpt', 'body', 'category', 'tags', 'cover', 'status']
+        fields = ['title', 'content', 'cover_image', 'categories', 'tags', 'status']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Titre de votre article...',
-                'required': True
-            }),
-            'excerpt': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Résumé bref de votre article...',
+                'placeholder': 'Your article title...',
                 'required': True
             }),
             'content': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 15,
-                'placeholder': 'Contenu détaillé de votre article...',
+                'placeholder': 'Content of your article...',
                 'required': True,
                 'id': 'article-content'
             }),
-            'category': forms.Select(attrs={
+            'categories': forms.SelectMultiple(attrs={
                 'class': 'form-select',
-                'required': True
+                'required': False
             }),
             'tags': forms.SelectMultiple(attrs={
                 'class': 'form-select',
                 'required': False
             }),
-            'cover': forms.FileInput(attrs={
+            'cover_image': forms.FileInput(attrs={
                 'class': 'form-control',
                 'accept': 'image/*'
             }),
@@ -47,70 +41,72 @@ class ArticleCreateForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filtrer les catégories et tags disponibles
-        self.fields['category'].queryset = Category.objects.all()
+        # Filter available categories and tags
+        self.fields['categories'].queryset = Category.objects.all()
         self.fields['tags'].queryset = Tag.objects.all()
         
-        # Limiter les choix de statut pour les utilisateurs normaux
+        # Limit status choices for regular users
         if 'status' in self.fields:
             self.fields['status'].choices = [
-                ('draft', 'Brouillon'),
-                ('published', 'Publié')
+                ('draft', 'Draft'),
+                ('pending_review', 'Submit for Review')
             ]
     
     def clean_title(self):
         title = self.cleaned_data.get('title')
         if len(title) < 5:
-            raise forms.ValidationError("Le titre doit contenir au moins 5 caractères.")
+            raise forms.ValidationError("Title must be at least 5 characters.")
         return title
     
-    def clean_content(self):
-        content = self.cleaned_data.get('content')
-        if len(content) < 50:
-            raise forms.ValidationError("Le contenu doit contenir au moins 50 caractères.")
-        return content
-    
-    def clean_excerpt(self):
-        excerpt = self.cleaned_data.get('excerpt')
-        if len(excerpt) < 10:
-            raise forms.ValidationError("Le résumé doit contenir au moins 10 caractères.")
-        return excerpt
+    def clean_cover_image(self):
+        cover_image = self.cleaned_data.get('cover_image')
+        if cover_image:
+            # Validate file size (max 5MB)
+            if cover_image.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("Image file too large ( > 5MB )")
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+            if hasattr(cover_image, 'content_type') and cover_image.content_type not in allowed_types:
+                raise forms.ValidationError(f"Unsupported image type. Allowed: {', '.join(allowed_types)}")
+            
+            # Validate file extension as backup
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+            ext = cover_image.name.lower().split('.')[-1] if '.' in cover_image.name else ''
+            if f'.{ext}' not in allowed_extensions:
+                raise forms.ValidationError(f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}")
+        
+        return cover_image
 
 
 class ArticleUpdateForm(forms.ModelForm):
-    """Formulaire de modification d'article."""
+    """Article update form."""
     
     class Meta:
         model = Article
-        fields = ['title', 'excerpt', 'body', 'category', 'tags', 'cover', 'status']
+        fields = ['title', 'content', 'cover_image', 'categories', 'tags', 'status']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Titre de votre article...',
-                'required': True
-            }),
-            'excerpt': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Résumé bref de votre article...',
+                'placeholder': 'Your article title...',
                 'required': True
             }),
             'content': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 15,
-                'placeholder': 'Contenu détaillé de votre article...',
+                'placeholder': 'Content of your article...',
                 'required': True,
                 'id': 'article-content'
             }),
-            'category': forms.Select(attrs={
+            'categories': forms.SelectMultiple(attrs={
                 'class': 'form-select',
-                'required': True
+                'required': False
             }),
             'tags': forms.SelectMultiple(attrs={
                 'class': 'form-select',
                 'required': False
             }),
-            'cover': forms.FileInput(attrs={
+            'cover_image': forms.FileInput(attrs={
                 'class': 'form-control',
                 'accept': 'image/*'
             }),
@@ -121,12 +117,32 @@ class ArticleUpdateForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['category'].queryset = Category.objects.all()
+        self.fields['categories'].queryset = Category.objects.all()
         self.fields['tags'].queryset = Tag.objects.all()
         
-        # Limiter les choix de statut pour les utilisateurs normaux
+        # Limit status choices for regular users
         if 'status' in self.fields:
             self.fields['status'].choices = [
-                ('draft', 'Brouillon'),
-                ('published', 'Publié')
+                ('draft', 'Draft'),
+                ('pending_review', 'Submit for Review')
             ]
+    
+    def clean_cover_image(self):
+        cover_image = self.cleaned_data.get('cover_image')
+        if cover_image:
+            # Validate file size (max 5MB)
+            if cover_image.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("Image file too large ( > 5MB )")
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+            if hasattr(cover_image, 'content_type') and cover_image.content_type not in allowed_types:
+                raise forms.ValidationError(f"Unsupported image type. Allowed: {', '.join(allowed_types)}")
+            
+            # Validate file extension as backup
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
+            ext = cover_image.name.lower().split('.')[-1] if '.' in cover_image.name else ''
+            if f'.{ext}' not in allowed_extensions:
+                raise forms.ValidationError(f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}")
+        
+        return cover_image

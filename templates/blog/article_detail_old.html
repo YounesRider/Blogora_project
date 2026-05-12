@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ article.title }} | Smart Blog AI{% endblock %}
+{% block meta_description %}{{ article.content|striptags|truncatechars:160 }}{% endblock %}
+
+{% block content %}
+<article class="mb-5">
+    <header class="mb-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                {% if article.category %}
+                <a href="{% url 'blog:category' article.category.slug %}" class="badge bg-primary text-decoration-none">
+                    {{ article.category.name }}
+                </a>
+                {% endif %}
+                {% if article.is_featured %}
+                <span class="badge bg-warning text-dark ms-2">
+                    <i class="bi bi-star"></i> En vedette
+                </span>
+                {% endif %}
+            </div>
+            <div class="text-end">
+                <small class="text-muted">
+                    <i class="bi bi-clock"></i> {{ article.reading_time }} min de lecture
+                </small>
+            </div>
+        </div>
+
+        <h1 class="display-5 fw-bold mb-3">{{ article.title }}</h1>
+
+        <div class="d-flex justify-content-between align-items-center text-muted mb-3">
+            <div>
+                <i class="bi bi-person"></i>
+                <a href="#" class="text-decoration-none">{{ article.author.full_name }}</a>
+                <span class="mx-2">•</span>
+                <i class="bi bi-calendar"></i> {{ article.published_at|date:"d F Y" }}
+                <span class="mx-2">•</span>
+                <i class="bi bi-eye"></i> {{ article.view_count }} vues
+            </div>
+        </div>
+
+        {% if article.tags.all %}
+        <div class="mb-3">
+            {% for tag in article.tags.all %}
+            <a href="{% url 'blog:tag' tag.slug %}" class="badge bg-light text-dark text-decoration-none me-1">
+                #{{ tag.name }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </header>
+
+{% if article.cover_image %}
+    <div class="mb-4">
+        <img src="{{ article.cover_image.url }}" class="img-fluid rounded" alt="{{ article.title }}">
+    </div>
+    {% endif %}
+
+    <div class="article-content mb-4">
+        <div class="prose">
+            {{ article.body|linebreaks }}
+        </div>
+    </div>
+
+    <footer class="border-top pt-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="interaction-buttons">
+                {% if user.is_authenticated %}
+                <div class="d-flex gap-2 mb-4">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'love')" data-reaction="love" title="❤️ Love">
+                            <span class="reaction-emoji">❤️</span>
+                            <span class="reaction-count" id="reaction-count-love-{{ article.id }}">0</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'like')" data-reaction="like" title="👍 Like">
+                            <span class="reaction-emoji">👍</span>
+                            <span class="reaction-count" id="reaction-count-like-{{ article.id }}">0</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'laugh')" data-reaction="laugh"
+                            title="😂 Laugh">
+                            <span class="reaction-emoji">😂</span>
+                            <span class="reaction-count" id="reaction-count-laugh-{{ article.id }}">0</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'wow')" data-reaction="wow" title="😮 Wow">
+                            <span class="reaction-emoji">😮</span>
+                            <span class="reaction-count" id="reaction-count-wow-{{ article.id }}">0</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'sad')" data-reaction="sad" title="😢 Sad">
+                            <span class="reaction-emoji">😢</span>
+                            <span class="reaction-count" id="reaction-count-sad-{{ article.id }}">0</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary reaction-btn"
+                            onclick="toggleReaction('{{ article.id }}', 'angry')" data-reaction="angry"
+                            title="😠 Angry">
+                            <span class="reaction-emoji">😠</span>
+                            <span class="reaction-count" id="reaction-count-angry-{{ article.id }}">0</span>
+                        </button>
+                    </div>
+
+                    <button class="btn btn-outline-primary" id="like-btn-{{ article.id }}"
+                        onclick="toggleLike('{{ article.id }}')">
+                        <i class="bi bi-heart"></i>
+                        <span id="like-count-{{ article.id }}">{{ article.likes.count }}</span>
+                    </button>
+
+                    <button class="btn btn-outline-secondary" id="save-btn-{{ article.id }}"
+                        onclick="toggleSave('{{ article.id }}')">
+                        <i class="bi bi-bookmark"></i>
+                        <span id="save-text-{{ article.id }}">Sauvegarder</span>
+                    </button>
+                </div>
+                {% else %}
+                <a href="{% url 'account_login' %}" class="btn btn-outline-danger me-2">
+                    <i class="bi bi-heart"></i> J'aime
+                </a>
+                <a href="{% url 'account_login' %}" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-bookmark"></i> Sauvegarder
+                </a>
+                {% endif %}
+
+                <span class="text-muted">
+                    <span id="like-count-{{ article.id }}">{{ article.likes.count }}</span> likes •
+                    <span id="save-count-{{ article.id }}">{{ article.saves.count }}</span> sauvegardes
+                </span>
+            </div>
+
+            <div class="share-buttons">
+                <button class="btn btn-outline-secondary"
+                    onclick="navigator.share({title: '{{ article.title }}', url: window.location.href})">
+                    <i class="bi bi-share"></i> Partager
+                </button>
+            </div>
+        </div>
+    </footer>
+</article>
+
+{% if similar_articles %}
+<section class="mt-5">
+    <h3 class="mb-4">
+        <i class="bi bi-collection"></i> Articles similaires
+    </h3>
+    <div class="row">
+        {% for similar in similar_articles %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                {% if similar.cover_image %}
+                <img src="{{ similar.cover_image.url }}" class="card-img-top" alt="{{ similar.title }}">
+                {% endif %}
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <a href="{{ similar.get_absolute_url }}" class="text-decoration-none text-dark">
+                            {{ similar.title|truncatechars:60 }}
+                        </a>
+                    </h6>
+                    <p class="card-text text-muted small">{{ similar.content|striptags|truncatewords:15 }}</p>
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> {{ similar.reading_time }} min •
+                        <i class="bi bi-eye"></i> {{ similar.view_count }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="mt-5">
+    <h3 class="mb-4">
+        <i class="bi bi-chat-dots"></i> Commentaires ({{ article.comments.count }})
+    </h3>
+
+    {% if user.is_authenticated %}
+    {% if article.allow_comments %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5>Laisser un commentaire</h5>
+            <form method="post" action="{% url 'comments:create' article.id %}" id="comment-form">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <textarea name="content" class="form-control" rows="3" placeholder="Partagez votre réflexion..."
+                        required minlength="10"></textarea>
+                    <div class="form-text">Minimum 10 caractères</div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Publier
+                </button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Les commentaires sont désactivés pour cet article.
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="text-center py-4 bg-light rounded">
+        <h5><i class="bi bi-lock"></i> Connectez-vous pour commenter</h5>
+        <p class="text-muted">Rejoignez la communauté pour participer à la discussion.</p>
+        <a href="{% url 'account_login' %}" class="btn btn-primary me-2">Connexion</a>
+        <a href="{% url 'account_signup' %}" class="btn btn-outline-primary">Inscription</a>
+    </div>
+    {% endif %}
+
+    <div class="comments-section">
+        {% for comment in article.comments.all %}
+        <div class="card mb-3 {% if comment.parent %}ms-4{% endif %}" id="comment-{{ comment.id }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex align-items-center">
+                        {% if comment.author.profile.avatar %}
+                        <img src="{{ comment.author.profile.avatar.url }}" class="rounded-circle me-2" width="32"
+                            height="32" alt="Avatar">
+                        {% else %}
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
+                            style="width: 32px; height: 32px; font-size: 0.8rem;">
+                            {{ comment.author.email|first|upper }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <strong>{{ comment.author.full_name|default:comment.author.email }}</strong>
+                            {% if comment.is_reply %}
+                            <span class="badge bg-secondary ms-1">réponse</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted me-2">{{ comment.created_at|date:"d M Y H:i" }}</small>
+                        {% if user.is_authenticated %}
+                        {% if comment.author == user %}
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'comments:edit' comment.id %}">
+                                        <i class="bi bi-pencil"></i> Modifier
+                                    </a></li>
+                                <li><a class="dropdown-item text-danger" href="{% url 'comments:delete' comment.id %}">
+                                        <i class="bi bi-trash"></i> Supprimer
+                                    </a></li>
+                            </ul>
+                        </div>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-danger" type="button"
+                            onclick="toggleCommentLike({{ comment.id }})">
+                            <i class="bi bi-heart{% if comment.liked %}-fill{% endif %}"></i>
+                            <span class="ms-1">{{ comment.likes.count }}</span>
+                        </button>
+                        <div id="comment-loading-{{ comment.id }}" class="htmx-indicator d-none">
+                            <i class="bi bi-arrow-clockwise bi-spin"></i>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-2">{{ comment.content|linebreaks }}</div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div id="comment-likes-{{ comment.id }}">
+                        <small class="text-muted">
+                            <i class="bi bi-heart"></i> {{ comment.likes.count }}
+                            {% if comment.likes.count == 1 %}like{% else %}likes{% endif %}
+                        </small>
+                    </div>
+
+                    {% if user.is_authenticated and not comment.parent %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="showReplyForm({{ comment.id }})">
+                        <i class="bi bi-reply"></i> Reply
+                    </button>
+                    {% endif %}
+                </div>
+
+                <!-- Formulaire de réponse caché -->
+                {% if user.is_authenticated and not comment.parent %}
+                <div id="reply-form-{{ comment.id }}" class="mt-3" style="display: none;">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="mb-3">Répondre à {{ comment.author.full_name|default:comment.author.email }}</h6>
+                            <form method="post" action="{% url 'comments:create' article.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="parent_id" value="{{ comment.id }}">
+                                <div class="mb-3">
+                                    <textarea name="content" class="form-control" rows="2"
+                                        placeholder="Votre réponse..." required minlength="10"></textarea>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary btn-sm">Répondre</button>
+                                    <button type="button" class="btn btn-secondary btn-sm"
+                                        onclick="hideReplyForm({{ comment.id }})">Annuler</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4">
+            <i class="bi bi-chat-dots display-4 text-muted"></i>
+            <h5 class="mt-3">Aucun commentaire pour le moment</h5>
+            <p class="text-muted">Soyez le premier à partager votre réflexion !</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Fonctions pour les commentaires
+    function showReplyForm(commentId) {
+        document.getElementById(`reply-form-${commentId}`).style.display = 'block';
+    }
+
+    function hideReplyForm(commentId) {
+        document.getElementById(`reply-form-${commentId}`).style.display = 'none';
+    }
+
+    // Tracking du temps de lecture
+    let startTime = Date.now();
+    let readingTracked = false;
+
+    // Fonctions pour les réactions
+    function toggleReaction(articleId, reactionType) {
+        fetch(`/interactions/reaction/${articleId}/${reactionType}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateReactionButtons(articleId, data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function toggleLike(articleId) {
+        fetch(`/interactions/like/article/${articleId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateLikeButton(articleId, data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function toggleSave(articleId) {
+        fetch(`/interactions/save/article/${articleId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateSaveButton(articleId, data);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function updateReactionButtons(articleId, data) {
+        // Mettre à jour tous les compteurs de réactions
+        for (const [reactionType, count] of Object.entries(data.reaction_counts)) {
+            const countElement = document.getElementById(`reaction-count-${reactionType}-${articleId}`);
+            if (countElement) {
+                countElement.textContent = count;
+            }
+        }
+
+        // Mettre à jour l'état des boutons de réactions
+        const reactionButtons = document.querySelectorAll(`[data-reaction]`);
+        reactionButtons.forEach(button => {
+            const reaction = button.dataset.reaction;
+            if (data.user_reactions.includes(reaction)) {
+                button.classList.add('active');
+                button.classList.add('btn-primary');
+                button.classList.remove('btn-outline-primary');
+            } else {
+                button.classList.remove('active');
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-outline-primary');
+            }
+        });
+    }
+
+    function updateLikeButton(articleId, data) {
+        const likeBtn = document.getElementById(`like-btn-${articleId}`);
+        const likeCount = document.getElementById(`like-count-${articleId}`);
+
+        if (likeBtn && likeCount) {
+            if (data.liked) {
+                likeBtn.classList.add('btn-primary');
+                likeBtn.classList.remove('btn-outline-primary');
+                likeBtn.innerHTML = `<i class="bi bi-heart-fill"></i> <span id="like-count-${articleId}">${data.like_count}</span>`;
+            } else {
+                likeBtn.classList.remove('btn-primary');
+                likeBtn.classList.add('btn-outline-primary');
+                likeBtn.innerHTML = `<i class="bi bi-heart"></i> <span id="like-count-${articleId}">${data.like_count}</span>`;
+            }
+        }
+    }
+
+    function updateSaveButton(articleId, data) {
+        const saveBtn = document.getElementById(`save-btn-${articleId}`);
+        const saveText = document.getElementById(`save-text-${articleId}`);
+
+        if (saveBtn && saveText) {
+            if (data.saved) {
+                saveBtn.classList.add('btn-primary');
+                saveBtn.classList.remove('btn-outline-secondary');
+                saveText.textContent = 'Sauvegardé';
+            } else {
+                saveBtn.classList.remove('btn-primary');
+                saveBtn.classList.add('btn-outline-secondary');
+                saveText.textContent = 'Sauvegarder';
+            }
+        }
+    }
+
+    function toggleCommentLike(commentId) {
+        fetch(`/interactions/like/comment/${commentId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const commentLikes = document.getElementById(`comment-likes-${commentId}`);
+                    if (commentLikes) {
+                        commentLikes.innerHTML = `\n                            <small class="text-muted">\n                                <i class="bi bi-heart"></i> ${data.like_count}\n                                ${data.like_count === 1 ? 'like' : 'likes'}\n                            </small>\n                        `;
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // Load initial reactions
+    document.addEventListener('DOMContentLoaded', function () {
+        const articleId = {{ article.id }};
+        fetch(`/interactions/reactions/${articleId}/`)
+            .then(response => response.json())
+            .then(data => {
+                updateReactionButtons(articleId, data);
+                updateLikeButton(articleId, data);
+                updateSaveButton(articleId, data);
+            })
+            .catch(error => console.error('Error loading reactions:', error));
+    });
+
+    // Add missing event handlers
+    function hideReplyForm(commentId) {
+        const replyForm = document.getElementById(`reply-form-${commentId}`);
+        if (replyForm) {
+            replyForm.style.display = 'none';
+        }
+    }
+
+    function showReplyForm(commentId) {
+        const replyForm = document.getElementById(`reply-form-${commentId}`);
+        if (replyForm) {
+            replyForm.style.display = 'block';
+        }
+    }
+
+    window.addEventListener('beforeunload', function () {
+        if (!readingTracked) {
+            const duration = Math.floor((Date.now() - startTime) / 1000);
+            if (duration > 10) { // Envoyer seulement si > 10s
+                fetch(`/api/v1/track-reading/{{ article.id }}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ duration: duration })
+                });
+            }
+        }
+    });
+</script>
+{% endblock %}

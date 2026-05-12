@@ -15,11 +15,17 @@ Fonctionnalités intégrées :
 """
 from django.shortcuts import render, get_object_or_404, redirect
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, F, Sum
+from django.db import models
+from django.db.models import Q, Count, F, Sum, Subquery, OuterRef
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required
+from django.contrib.contenttypes.models import ContentType
+from apps.core.mixins import AuthorRequiredMixin, OwnerRequiredMixin
 from django.contrib import messages
 from django.urls import reverse_lazy
 from .models import Article
@@ -60,30 +66,41 @@ class ArticleListView(ListView):
         - tag_slug : filtre par tag via URL  
         - q : recherche textuelle dans titre/extrait/contenu
         """
+        from apps.interactions.models import Like
+        
+        article_content_type = ContentType.objects.get_for_model(Article)
+        
+        # Subquery to count likes for each article
+        likes_subquery = Like.objects.filter(
+            content_type=article_content_type,
+            object_id=OuterRef('pk')
+        ).values('object_id').annotate(
+            count=Count('id')
+        ).values('count')[:1]
+        
         queryset = Article.objects.filter(status='published').select_related(
-            'author', 'category'
-        ).prefetch_related('tags').annotate(
-            like_count=Count('likes'),
+            'author'
+        ).prefetch_related('categories', 'tags').annotate(
+            like_count=Subquery(likes_subquery, output_field=models.IntegerField()),
             save_count=Count('saves')
-        ).order_by('-published_at')
+        ).order_by('-created_at')
 
-        # Filtre par catégorie depuis l'URL (/category/tech/)
+        # Filter by category from URL
         category_slug = self.kwargs.get('category_slug')
         if category_slug:
-            queryset = queryset.filter(category__slug=category_slug)
+            queryset = queryset.filter(categories__slug=category_slug)
 
-        # Filtre par tag depuis l'URL (/tag/python/)
+        # Filter by tag from URL
         tag_slug = self.kwargs.get('tag_slug')
         if tag_slug:
             queryset = queryset.filter(tags__slug=tag_slug)
 
-        # Recherche textuelle depuis le paramètre GET ?q=terme
+        # Text search from GET parameter ?q=term
         search = self.request.GET.get('q')
         if search:
             queryset = queryset.filter(
                 Q(title__icontains=search) |
-                Q(excerpt__icontains=search) |
-                Q(body__icontains=search)
+                Q(content__icontains=search)
             )
 
         return queryset
@@ -91,22 +108,70 @@ class ArticleListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Recommandations personnalisées si utilisateur connecté
+        # Personalized recommendations if user is authenticated
         if self.request.user.is_authenticated:
-            recommended_ids = get_recommendations(
-                self.request.user.id, 
-                top_k=5, 
-                exclude_seen=True
+            try:
+                from apps.recommendations.predict import get_recommendations
+                recommended_ids = get_recommendations(
+                    self.request.user.id, 
+                    top_k=5, 
+                    exclude_seen=True
+                )
+                context['recommended_articles'] = Article.objects.filter(
+                    id__in=recommended_ids
+                ).select_related('author')
+            except:
+                # Fallback if recommendations fail
+                context['recommended_articles'] = Article.objects.none()
+
+            # Build liked/saved state for the current user on listed articles
+            from apps.interactions.models import Like, SavedArticle
+            article_content_type = ContentType.objects.get_for_model(Article)
+            articles_page = context['articles']
+            article_objs = getattr(articles_page, 'object_list', articles_page)
+            article_ids = []
+            try:
+                article_ids = list(article_objs.values_list('pk', flat=True))
+            except Exception:
+                article_ids = [article.pk for article in article_objs]
+
+            liked_article_ids = set(
+                Like.objects.filter(
+                    user=self.request.user,
+                    content_type=article_content_type,
+                    object_id__in=article_ids
+                ).values_list('object_id', flat=True)
             )
-            context['recommended_articles'] = Article.objects.filter(
-                id__in=recommended_ids
-            ).select_related('author', 'category')
+            saved_article_ids = set(
+                SavedArticle.objects.filter(
+                    user=self.request.user,
+                    article__pk__in=article_ids
+                ).values_list('article_id', flat=True)
+            )
+            context['user_liked_article_ids'] = liked_article_ids
+            context['user_saved_article_ids'] = saved_article_ids
+        else:
+            context['user_liked_article_ids'] = set()
+            context['user_saved_article_ids'] = set()
         
-        # Articles populaires (fallback)
+        # Popular articles (fallback)
+        from apps.interactions.models import Like
+        
+        article_content_type = ContentType.objects.get_for_model(Article)
+        
+        # Subquery to count likes for each article
+        likes_subquery = Like.objects.filter(
+            content_type=article_content_type,
+            object_id=OuterRef('pk')
+        ).values('object_id').annotate(
+            count=Count('id')
+        ).values('count')[:1]
+        
         context['popular_articles'] = Article.objects.filter(
             status='published'
         ).annotate(
-            popularity_score=F('view_count') + Count('likes') * 3 + Count('saves') * 2
+            like_count=Subquery(likes_subquery, output_field=models.IntegerField()),
+            popularity_score=F('view_count') + Subquery(likes_subquery, output_field=models.IntegerField()) * 3 + Count('saves') * 2
         ).order_by('-popularity_score')[:5]
         
         return context
@@ -120,8 +185,8 @@ class ArticleDetailView(DetailView):
 
     def get_queryset(self):
         return Article.objects.filter(status='published').select_related(
-            'author', 'category'
-        ).prefetch_related('tags', 'comments__author')
+            'author'
+        ).prefetch_related('categories', 'tags', 'comments__author')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -139,19 +204,96 @@ class ArticleDetailView(DetailView):
                 defaults={'reading_duration': 0}
             )
         
-        # Articles similaires (même catégorie ou tags)
+        # Similar articles (same category or tags)
         similar_articles = Article.objects.filter(
             status='published'
         ).filter(
-            Q(category=article.category) | 
+            Q(categories__in=article.categories.all()) |
             Q(tags__in=article.tags.all())
-        ).exclude(pk=article.pk).distinct().select_related('author', 'category')[:6]
+        ).exclude(pk=article.pk).distinct().select_related('author')[:6]
         
         context['similar_articles'] = similar_articles
+        
+        # Add interaction data
+        from apps.interactions.models import Like, SavedArticle, Reaction
+        from django.contrib.contenttypes.models import ContentType
+        import json
+        
+        if self.request.user.is_authenticated:
+            
+            # Get like state and count
+            content_type = ContentType.objects.get_for_model(Article)
+            liked = Like.objects.filter(
+                user=self.request.user,
+                content_type=content_type,
+                object_id=article.id
+            ).exists()
+            
+            likes_count = Like.objects.filter(
+                content_type=content_type,
+                object_id=article.id
+            ).count()
+            
+            # Get save state and count
+            saved = SavedArticle.objects.filter(
+                user=self.request.user,
+                article=article
+            ).exists()
+            
+            saves_count = SavedArticle.objects.filter(article=article).count()
+            
+            # Get reaction data
+            reaction_counts = {}
+            from apps.interactions.models import Reaction
+            for reaction_type in Reaction.ReactionType:
+                reaction_counts[reaction_type.value] = Reaction.objects.filter(
+                    article=article, 
+                    reaction_type=reaction_type.value
+                ).count()
+            
+            user_reactions = list(
+                Reaction.objects.filter(article=article, user=self.request.user)
+                .values_list('reaction_type', flat=True)
+            )
+            
+            # Add context variables
+            context.update({
+                'liked': liked,
+                'saved': saved,
+                'likes_count': likes_count,
+                'saves_count': saves_count,
+                'reactions_types': [rt.value for rt in Reaction.ReactionType],
+                'reactions_json': json.dumps(reaction_counts),
+                'user_reactions': json.dumps(user_reactions),
+                'reaction_counts': reaction_counts,
+            })
+        else:
+            # Non-authenticated users get default values
+            reaction_counts = {}
+            for reaction_type in Reaction.ReactionType:
+                reaction_counts[reaction_type.value] = Reaction.objects.filter(
+                    article=article, 
+                    reaction_type=reaction_type.value
+                ).count()
+            
+            context.update({
+                'liked': False,
+                'saved': False,
+                'likes_count': Like.objects.filter(
+                    content_type=ContentType.objects.get_for_model(Article),
+                    object_id=article.id
+                ).count(),
+                'saves_count': SavedArticle.objects.filter(article=article).count(),
+                'reactions_types': [rt.value for rt in Reaction.ReactionType],
+                'reactions_json': json.dumps(reaction_counts),
+                'user_reactions': json.dumps([]),
+                'reaction_counts': reaction_counts,
+            })
+        
         return context
 
 
-class ArticleCreateView(LoginRequiredMixin, CreateView):
+class ArticleCreateView(AuthorRequiredMixin, CreateView):
     """Création d'un nouvel article."""
     model = Article
     form_class = ArticleCreateForm
@@ -160,34 +302,26 @@ class ArticleCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.slug = self.generate_unique_slug(form.cleaned_data['title'])
-        messages.success(self.request, 'Votre article a été créé avec succès !')
+        # Handle publish/submit for review logic
+        if form.cleaned_data['status'] == 'pending_review':
+            if self.request.user.profile.auto_publish:
+                form.instance.status = 'published'
+                messages.success(self.request, 'Your article has been published!')
+            else:
+                messages.success(self.request, 'Your article has been submitted for review.')
+        else:
+            messages.success(self.request, 'Your article has been saved as draft.')
         return super().form_valid(form)
     
-    def generate_unique_slug(self, title):
-        """Génère un slug unique à partir du titre."""
-        from django.utils.text import slugify
-        import uuid
-        
-        base_slug = slugify(title)
-        unique_slug = base_slug
-        
-        # Vérifier si le slug existe déjà
-        counter = 1
-        while Article.objects.filter(slug=unique_slug).exists():
-            unique_slug = f"{base_slug}-{counter}"
-            counter += 1
-        
-        return unique_slug
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Créer un article'
-        context['description'] = 'Rédigez et publiez votre article sur Smart Blog AI'
+        context['title'] = 'Create Article'
+        context['description'] = 'Write and publish your article on Blogora'
         return context
 
 
-class ArticleUpdateView(LoginRequiredMixin, UpdateView):
+class ArticleUpdateView(AuthorRequiredMixin, OwnerRequiredMixin, UpdateView):
     """Modification d'un article existant."""
     model = Article
     form_class = ArticleUpdateForm
@@ -195,21 +329,21 @@ class ArticleUpdateView(LoginRequiredMixin, UpdateView):
     success_url = reverse_lazy('blog:my_articles')
     
     def get_queryset(self):
-        """L'utilisateur ne peut modifier que ses propres articles."""
+        """User can only edit their own articles."""
         return Article.objects.filter(author=self.request.user)
     
     def form_valid(self, form):
-        messages.success(self.request, 'Votre article a été mis à jour avec succès !')
+        messages.success(self.request, 'Your article has been updated successfully!')
         return super().form_valid(form)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Modifier un article'
-        context['description'] = 'Modifiez votre article sur Smart Blog AI'
+        context['title'] = 'Edit Article'
+        context['description'] = 'Edit your article on Blogora'
         return context
 
 
-class MyArticlesView(LoginRequiredMixin, ListView):
+class MyArticlesView(AuthorRequiredMixin, ListView):
     """Liste des articles de l'utilisateur connecté."""
     model = Article
     template_name = 'blog/my_articles.html'
@@ -217,58 +351,128 @@ class MyArticlesView(LoginRequiredMixin, ListView):
     paginate_by = 12
     
     def get_queryset(self):
-        return Article.objects.filter(author=self.request.user).select_related('category')
+        return Article.objects.filter(author=self.request.user).prefetch_related('categories')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Mes articles'
-        context['description'] = 'Gérez tous vos articles publiés et brouillons'
+        context['title'] = 'My Articles'
+        context['description'] = 'Manage all your published and draft articles'
         
-        # Statistiques
+        # Statistics
         articles = context['articles']
         context['total_articles'] = Article.objects.filter(author=self.request.user).count()
         context['published_articles'] = Article.objects.filter(author=self.request.user, status='published').count()
         context['draft_articles'] = Article.objects.filter(author=self.request.user, status='draft').count()
+        context['pending_articles'] = Article.objects.filter(author=self.request.user, status='pending_review').count()
         context['total_views'] = Article.objects.filter(author=self.request.user).aggregate(total=Sum('view_count'))['total'] or 0
-        
         return context
 
 
-class ArticleDeleteView(LoginRequiredMixin, DeleteView):
+class ArticleDeleteView(AuthorRequiredMixin, OwnerRequiredMixin, DeleteView):
     """Suppression d'un article."""
     model = Article
     template_name = 'blog/article_confirm_delete.html'
     success_url = reverse_lazy('blog:my_articles')
     
     def get_queryset(self):
-        """L'utilisateur ne peut supprimer que ses propres articles."""
+        """User can only delete their own articles."""
         return Article.objects.filter(author=self.request.user)
     
     def delete(self, request, *args, **kwargs):
-        messages.success(self.request, 'Votre article a été supprimé avec succès !')
+        messages.success(self.request, 'Your article has been deleted successfully!')
         return super().delete(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Supprimer un article'
-        context['description'] = 'Confirmez la suppression de votre article'
+        context['title'] = 'Delete Article'
+        context['description'] = 'Confirm the deletion of your article'
         return context
 
 
 def home(request):
-    """Page d'accueil avec articles récents et recommandations."""
+    """Home page with recent articles and recommendations."""
     recent_articles = Article.objects.filter(
         status='published'
-    ).select_related('author', 'category').order_by('-published_at')[:6]
+    ).select_related('author').order_by('-created_at')[:6]
     
     context = {
         'recent_articles': recent_articles,
     }
     
     if request.user.is_authenticated:
-        recommended_ids = get_recommendations(request.user.id, top_k=6, exclude_seen=True)
-        context['recommended_articles'] = Article.objects.filter(
-            id__in=recommended_ids
-        ).select_related('author', 'category')
+        try:
+            recommended_ids = get_recommendations(request.user.id, top_k=6, exclude_seen=True)
+            context['recommended_articles'] = Article.objects.filter(
+                id__in=recommended_ids
+            ).select_related('author')
+        except:
+            # Fallback if recommendations fail
+            context['recommended_articles'] = Article.objects.none()
+
+    from apps.interactions.models import Like
+    article_content_type = ContentType.objects.get_for_model(Article)
+    likes_subquery = Like.objects.filter(
+        content_type=article_content_type,
+        object_id=OuterRef('pk')
+    ).values('object_id').annotate(count=Count('id')).values('count')[:1]
+    context['popular_articles'] = (
+        Article.objects.filter(status='published')
+        .select_related('author')
+        .annotate(
+            like_count=Subquery(likes_subquery, output_field=models.IntegerField()),
+            popularity_score=F('view_count') + Count('saves') * 2,
+        )
+        .order_by('-popularity_score')[:5]
+    )
     
     return render(request, 'blog/home.html', context)
+
+
+@login_required
+def preview_article(request):
+    """Preview article based on form data."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Only GET requests allowed'}, status=405)
+    
+    title = request.GET.get('title', '')
+    content = request.GET.get('content', '')
+    status = request.GET.get('status', 'draft')
+    
+    # Create a temporary article object for preview with proper methods
+    class TempArticle:
+        def __init__(self, title, content, status, author, created_at, updated_at):
+            self.title = title
+            self.content = content
+            self.status = status
+            self.author = author
+            self.created_at = created_at
+            self.updated_at = updated_at
+        
+        def get_status_display(self):
+            status_choices = {
+                'draft': 'Draft',
+                'pending_review': 'Pending Review',
+                'published': 'Published',
+                'rejected': 'Rejected',
+                'archived': 'Archived'
+            }
+            return status_choices.get(self.status, self.status.title)
+        
+        def get_read_time(self):
+            # Simple estimation based on content length
+            word_count = len(self.content.split()) if self.content else 0
+            return max(1, word_count // 200)  # Assume 200 words per minute
+    
+    temp_article = TempArticle(title, content, status, request.user, timezone.now(), timezone.now())
+    
+    return render(request, 'blog/article_preview.html', {'article': temp_article})
+
+
+@login_required
+@require_POST
+def submit_for_review(request, slug):
+    article = get_object_or_404(Article, slug=slug, author=request.user)
+    article.status = "pending_review"
+    article.save(update_fields=["status", "updated_at"])
+    messages.success(request, "Article submitted for review.")
+    return redirect("blog:my_articles")

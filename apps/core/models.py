@@ -29,6 +29,7 @@ class PublishableModel(TimeStampedModel):
     """
     class Status(models.TextChoices):
         DRAFT = "draft", "Brouillon"
+        PENDING_REVIEW = "pending_review", "En attente de revue"
         PUBLISHED = "published", "Publié"
         ARCHIVED = "archived", "Archivé"
 
@@ -46,3 +47,37 @@ class PublishableModel(TimeStampedModel):
     @property
     def is_published(self) -> bool:
         return self.status == self.Status.PUBLISHED
+
+
+class Collection(TimeStampedModel):
+    """
+    Collection of articles for users to organize saved posts.
+    """
+    owner = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="collections"
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    is_private = models.BooleanField(
+        default=True,
+        help_text="If True, only the owner can see this collection"
+    )
+    articles = models.ManyToManyField(
+        "blog.Article",
+        blank=True,
+        related_name="collections"
+    )
+
+    class Meta:
+        verbose_name = "collection"
+        verbose_name_plural = "collections"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["owner", "is_private"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} by {self.owner}"

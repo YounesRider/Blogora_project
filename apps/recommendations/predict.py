@@ -47,12 +47,13 @@ def get_recommendations(user_id: int, top_k: int = 10, exclude_seen: bool = True
     
     # Pour les utilisateurs existants
     if model is None:
-        logger.warning("Modèle non entraîné. Fallback popularité.")
-        return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
+        logger.warning("Modèle non entraîné. Utilisation des préférences ou fallback popularité.")
+        # Try preferences-based first, then fallback
+        return _recommendations_for_new_user(user_id, top_k, exclude_seen)
 
     user_idx = model["user_idx"]
     if user_id not in user_idx:
-        logger.info(f"Utilisateur {user_id} pas dans le modèle - fallback avec préférences")
+        logger.info(f"Utilisateur {user_id} pas dans le modèle - utilisation des préférences ou fallback")
         return _recommendations_for_new_user(user_id, top_k, exclude_seen)
 
     # Utiliser le modèle ML entraîné
@@ -78,7 +79,7 @@ def _fallback_popular(top_k: int, user_id: int | None = None) -> list[int]:
     qs = (
         Article.objects
         .filter(status="published")
-        .order_by("-view_count", "-published_at")
+        .order_by("-view_count", "-created_at")
     )
     if user_id:
         from apps.interactions.models import ArticleView
@@ -105,25 +106,30 @@ def _recommendations_for_new_user(user_id: int, top_k: int, exclude_seen: bool) 
         # Articles dans les catégories préférées, triés par popularité
         queryset = Article.objects.filter(
             status='published',
-            category__in=preferred_categories
-        ).annotate(
-            popularity_score=F('view_count') + Count('likes') * 3 + Count('saves') * 2
-        ).order_by('-popularity_score', '-published_at')
+            categories__in=preferred_categories
+        ).order_by('-view_count', '-created_at').distinct()
         
         if exclude_seen:
             seen = _get_seen_article_ids(user_id)
             queryset = queryset.exclude(id__in=seen)
         
-        return list(queryset.values_list('id', flat=True)[:top_k])
+        recommended = list(queryset.values_list('id', flat=True)[:top_k])
+        return recommended
         
     except UserProfile.DoesNotExist:
         return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
 
 
 def _get_seen_article_ids(user_id: int) -> set:
-    from apps.interactions.models import ArticleView
-    return set(
-        ArticleView.objects
-        .filter(user_id=user_id)
-        .values_list("article_id", flat=True)
-    )
+    from apps.interactions.models import ArticleView, SavedArticle, Like
+    from django.contrib.contenttypes.models import ContentType
+    from apps.blog.models import Article
+
+    article_content_type = ContentType.objects.get_for_model(Article)
+    viewed = ArticleView.objects.filter(user_id=user_id).values_list("article_id", flat=True)
+    saved = SavedArticle.objects.filter(user_id=user_id).values_list("article_id", flat=True)
+    liked = Like.objects.filter(
+        user_id=user_id,
+        content_type=article_content_type,
+    ).values_list("object_id", flat=True)
+    return set(viewed) | set(saved) | set(liked)

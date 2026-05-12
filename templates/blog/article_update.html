@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit article - Smart Blog AI{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Edit article</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="article-form">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+                            {{ form.title }}
+                            {% for error in form.title.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Content</label>
+                            <div id="quill-editor" style="min-height: 260px;"></div>
+                            {{ form.content }}
+                            {% for error in form.content.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            <small class="text-muted">Rich text is saved as HTML.</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.categories.id_for_label }}" class="form-label">Categories</label>
+                                {{ form.categories }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.tags.id_for_label }}" class="form-label">Tags</label>
+                                {{ form.tags }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.cover_image.id_for_label }}" class="form-label">Cover image</label>
+                            {{ form.cover_image }}
+                            <div id="image-preview" class="mt-2" style="display: none;">
+                                <img id="preview-img" src="" alt="Image preview" class="img-fluid rounded" style="max-height: 200px;">
+                            </div>
+                            {% if object.cover_image %}
+                            <div class="mt-2">
+                                <small class="text-muted">Current image:</small><br>
+                                <img src="{{ object.cover_image.url }}" alt="Current cover image" class="img-fluid rounded" style="max-height: 150px;">
+                            </div>
+                            {% endif %}
+                            <small class="text-muted">Optional. Supported formats: JPEG, PNG, GIF, WebP, SVG. Max size: 5MB.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.status.id_for_label }}" class="form-label">Status</label>
+                            {{ form.status }}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'blog:my_articles' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary" data-action="draft">Save draft</button>
+                                <button type="button" class="btn btn-warning" data-action="pending_review">Submit for review</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const contentField = document.getElementById("{{ form.content.id_for_label }}");
+    contentField.style.display = "none";
+
+    const quill = new Quill("#quill-editor", {
+        theme: "snow",
+        modules: {
+            toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ["bold", "italic", "underline", "strike"],
+                [{ list: "ordered" }, { list: "bullet" }],
+                ["link", "blockquote", "code-block"],
+                ["clean"]
+            ]
+        }
+    });
+
+    if (contentField.value) {
+        quill.root.innerHTML = contentField.value;
+    }
+
+    const form = document.getElementById("article-form");
+    const statusField = document.getElementById("{{ form.status.id_for_label }}");
+
+    function submitWithStatus(status) {
+        contentField.value = quill.root.innerHTML;
+        statusField.value = status;
+        form.submit();
+    }
+
+    document.querySelectorAll("button[data-action]").forEach((button) => {
+        button.addEventListener("click", () => submitWithStatus(button.dataset.action));
+    });
+
+    form.addEventListener("submit", () => {
+        contentField.value = quill.root.innerHTML;
+    });
+
+    // Image preview functionality
+    const coverImageInput = document.getElementById("{{ form.cover_image.id_for_label }}");
+    const imagePreview = document.getElementById("image-preview");
+    const previewImg = document.getElementById("preview-img");
+
+    coverImageInput.addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Unsupported image type. Please select JPEG, PNG, GIF, WebP, or SVG.');
+                this.value = '';
+                imagePreview.style.display = 'none';
+                return;
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image file too large. Please select an image smaller than 5MB.');
+                this.value = '';
+                imagePreview.style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                imagePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            imagePreview.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

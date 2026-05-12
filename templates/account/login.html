@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center min-vh-100">
+    <div class="col-md-10 col-lg-6">
+        <div class="card shadow-lg">
+            <div class="row g-0">
+                <!-- Left side: Branding -->
+                <div class="col-md-6 d-none d-md-flex bg-primary text-white align-items-center justify-content-center">
+                    <div class="text-center p-4">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor" class="mb-3">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                        <h2 class="fw-bold mb-3">{{ site_name }}</h2>
+                        <p class="lead">Your creative writing platform</p>
+                        <p class="small">Share your thoughts with the world</p>
+                    </div>
+                </div>
+                
+                <!-- Right side: Login Form -->
+                <div class="col-md-6">
+                    <div class="card-body p-4">
+                        <h3 class="card-title text-center mb-4">Welcome Back</h3>
+                        <p class="text-muted text-center mb-4">Sign in to your account</p>
+                        
+                        <form method="post" class="login-form">
+                            {% csrf_token %}
+                            
+                            {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {% for field, errors in form.errors.items %}
+                                    {% for error in errors %}
+                                        <p class="mb-1">{{ error }}</p>
+                                    {% endfor %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <label for="id_login" class="form-label">Email or Username</label>
+                                <input type="text" name="login" class="form-control" id="id_login" 
+                                       placeholder="Enter your email or username" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label for="id_password" class="form-label">Password</label>
+                                    <a href="{% url 'account_reset_password' %}" class="text-decoration-none small">Forgot password?</a>
+                                </div>
+                                <div class="input-group">
+                                    <input type="password" name="password" class="form-control" id="id_password" 
+                                           placeholder="Enter your password" required>
+                                    <button class="btn btn-outline-secondary" type="button" id="toggle-password">
+                                        <i class="bi bi-eye" id="password-icon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" name="remember" id="id_remember" class="form-check-input">
+                                <label for="id_remember" class="form-check-label">
+                                    Remember me
+                                </label>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    Sign In
+                                </button>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <p class="mb-0">Don't have an account?</p>
+                                <a href="{% url 'account_signup' %}" class="btn btn-outline-primary">
+                                    Join {{ site_name }}
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .min-vh-100 {
+        min-height: 100vh;
+    }
+    
+    .card {
+        border: none;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+    }
+    
+    .card-body {
+        padding: 2rem;
+    }
+    
+    .login-form .form-control {
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        transition: all 0.2s ease;
+    }
+    
+    .login-form .form-control:focus {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+    }
+    
+    .login-form .btn {
+        padding: 0.75rem 2rem;
+        border-radius: var(--radius-md);
+        font-weight: 500;
+    }
+    
+    .input-group .form-control {
+        border-right: none;
+    }
+    
+    .input-group .btn {
+        border-left: none;
+    }
+</style>
+
+<script>
+    // Password toggle functionality
+    document.getElementById('toggle-password').addEventListener('click', function() {
+        const passwordInput = document.getElementById('id_password');
+        const passwordIcon = document.getElementById('password-icon');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            passwordIcon.className = 'bi bi-eye-slash';
+        } else {
+            passwordInput.type = 'password';
+            passwordIcon.className = 'bi bi-eye';
+        }
+    });
+</script>
+{% endblock %}
