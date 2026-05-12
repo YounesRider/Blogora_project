@@ -45,20 +45,6 @@ def read_time(minutes):
 
 
 @register.filter
-def emoji(reaction_type):
-    """Returns emoji for reaction type."""
-    emoji_map = {
-        'love': '❤️',
-        'like': '👍',
-        'laugh': '😂',
-        'wow': '😮',
-        'sad': '😢',
-        'angry': '😠',
-    }
-    return emoji_map.get(reaction_type, '👍')
-
-
-@register.filter
 def user_liked_comment(comment, user):
     """Check if a user has liked a comment."""
     if not user or not user.is_authenticated:
@@ -74,3 +60,9 @@ def user_liked_comment(comment, user):
         content_type=content_type,
         object_id=comment.id
     ).exists()
+
+
+@register.filter
+def classname(obj):
+    """Returns the class name of an object."""
+    return obj.__class__.__name__

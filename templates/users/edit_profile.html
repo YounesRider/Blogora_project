@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load profile_tags %}
 
-{% block title %}Modifier le profil | Smart Blog AI{% endblock %}
+{% block title %}Modifier le profil | Blogora{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -41,9 +41,9 @@
                     <div class="mb-3">
                         <label for="avatar" class="form-label">Avatar</label>
                         <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
-                        {% if profile.avatar %}
+                        {% if user.avatar %}
                         <div class="mt-2">
-                            <img src="{{ profile.avatar.url }}" class="rounded-circle" width="80" height="80"
+                            <img src="{{ user.avatar.url }}" class="rounded-circle" width="80" height="80"
                                 alt="Avatar actuel">
                             <div class="form-text">Avatar actuel</div>
                         </div>

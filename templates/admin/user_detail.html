@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% load admin_filters %}
+{% load static %}
+
+{% block title %}User Details - {{ user_obj.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">{{ user_obj.get_full_name|default:user_obj.username }}</h1>
+            <p class="text-muted mb-0">User ID: {{ user_obj.pk }} | Joined: {{ user_obj.date_joined|date:"M d, Y" }}</p>
+        </div>
+        <a href="{% url 'admin:users' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Users
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- User Info -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Account Information</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Username:</strong></p>
+                            <p class="text-muted">{{ user_obj.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Email:</strong></p>
+                            <p class="text-muted"><a href="mailto:{{ user_obj.email }}">{{ user_obj.email }}</a></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Full Name:</strong></p>
+                            <p class="text-muted">{{ user_obj.full_name|default:"Not set" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Role:</strong></p>
+                            <p>
+                                <span class="badge bg-{{ user_obj.role|role_color }}">
+                                    {{ user_obj.get_role_display }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Is Active:</strong></p>
+                            <p>
+                                <span class="badge {% if user_obj.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if user_obj.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Is Staff:</strong></p>
+                            <p>
+                                <span class="badge {% if user_obj.is_staff %}bg-info{% else %}bg-secondary{% endif %}">
+                                    {% if user_obj.is_staff %}Yes{% else %}No{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Profile -->
+            {% if profile %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Profile Information</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Bio:</strong></p>
+                            <p class="text-muted">{{ profile.bio|default:"Not set" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Location:</strong></p>
+                            <p class="text-muted">{{ profile.location|default:"Not set" }}</p>
+                        </div>
+                    </div>
+                    {% if user_obj.role in 'author,admin' %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Auto-Publish:</strong></p>
+                            <p>
+                                <span class="badge {% if profile.auto_publish %}bg-success{% else %}bg-warning{% endif %}">
+                                    {% if profile.auto_publish %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Author Request:</strong></p>
+                            <p>
+                                <span class="badge {% if profile.requested_author %}bg-info{% else %}bg-secondary{% endif %}">
+                                    {% if profile.requested_author %}Requested{% else %}Not Requested{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Articles -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">User's Articles ({{ article_count }})</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for article in articles %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'admin:article_detail' article.pk %}">
+                                            {{ article.title|truncatewords:10 }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ article.status|status_color }}">
+                                            {{ article.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ article.created_at|date:"M d, Y" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No articles</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Statistics -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Statistics</h5>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Articles</span>
+                            <span class="h6 mb-0">{{ article_count }}</span>
+                        </div>
+                        <small class="text-muted">
+                            {{ published_articles }} published, {{ draft_articles }} draft, {{ pending_articles }} pending
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Comments</span>
+                            <span class="h6 mb-0">{{ comment_count }}</span>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Received Likes</span>
+                            <span class="h6 mb-0">{{ received_likes }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Actions</h5>
+                    
+                    {% if user_obj.role != 'admin' %}
+                    <form method="post" action="{% url 'admin:toggle_user_role' user_obj.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-primary w-100 btn-sm mb-2">
+                            <i class="bi bi-arrows-expand"></i> Toggle Role
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if user_obj.role in 'author,admin' %}
+                    <form method="post" action="{% url 'admin:set_auto_publish' user_obj.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-info w-100 btn-sm mb-2">
+                            <i class="bi bi-lightning"></i> Toggle Auto-Publish
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if user_obj.role != 'moderator' and user_obj.role != 'admin' %}
+                    <form method="post" action="{% url 'admin:create_moderator' user_obj.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-success w-100 btn-sm mb-2">
+                            <i class="bi bi-shield-check"></i> Create Moderator
+                        </button>
+                    </form>
+                    {% elif user_obj.role == 'moderator' %}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-info-circle"></i> This user is a moderator. View in moderators list.
+                    </p>
+                    {% endif %}
+
+                    {% if user_obj.pk != request.user.pk %}
+                    <form method="post" action="{% url 'admin:delete_user' user_obj.pk %}" onsubmit="return confirm('Are you sure you want to delete this user and all their data?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger w-100 btn-sm">
+                            <i class="bi bi-trash"></i> Delete User
+                        </button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-danger w-100 btn-sm" disabled>
+                        <i class="bi bi-lock"></i> Cannot Delete Self
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="alert alert-info">
+                <small>
+                    <i class="bi bi-info-circle"></i> This user was created on {{ user_obj.date_joined|date:"M d, Y at H:i" }}.
+                    Last login: {% if user_obj.last_login %}{{ user_obj.last_login|date:"M d, Y at H:i" }}{% else %}Never{% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

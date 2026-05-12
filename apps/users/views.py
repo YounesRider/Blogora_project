@@ -70,7 +70,7 @@ def edit_profile(request):
         
         # Gestion de l'avatar
         if 'avatar' in request.FILES:
-            profile.avatar = request.FILES['avatar']
+            request.user.avatar = request.FILES['avatar']
         
         # Sauvegarde
         request.user.save()

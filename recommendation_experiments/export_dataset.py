@@ -17,14 +17,17 @@ def setup_django() -> None:
 
 
 def export_interactions() -> pd.DataFrame:
-    from apps.interactions.models import ArticleView, Like, SavedArticle
+    from django.contrib.contenttypes.models import ContentType
+    from apps.blog.models import Article
+    from apps.interactions.models import ArticleView, Like, SavedArticle, Reaction
 
+    article_content_type = ContentType.objects.get_for_model(Article)
     records = []
 
-    for like in Like.objects.select_related("user", "article").all():
+    for like in Like.objects.filter(content_type=article_content_type).select_related("user").all():
         records.append({
             "user_id": like.user_id,
-            "article_id": like.article_id,
+            "article_id": like.object_id,
             "event": "like",
             "weight": 3.0,
             "timestamp": like.created_at,
@@ -49,6 +52,15 @@ def export_interactions() -> pd.DataFrame:
             "timestamp": view.created_at,
         })
 
+    for reaction in Reaction.objects.select_related("user", "article").all():
+        records.append({
+            "user_id": reaction.user_id,
+            "article_id": reaction.article_id,
+            "event": "reaction",
+            "weight": 2.0,
+            "timestamp": reaction.created_at,
+        })
+
     df = pd.DataFrame(records)
     if df.empty:
         df = pd.DataFrame(columns=["user_id", "article_id", "event", "weight", "timestamp"])
@@ -64,10 +76,10 @@ def export_article_metadata() -> pd.DataFrame:
             "article_id": article.id,
             "title": article.title,
             "author_id": article.author_id,
-            "published_at": article.published_at,
+            "published_at": article.created_at,
             "created_at": article.created_at,
             "view_count": article.view_count,
-            "read_time": article.read_time,
+            "read_time": article.reading_time,
             "cover_image_name": article.cover_image.name if article.cover_image else "",
             "cover_image_url": article.cover_image.url if article.cover_image else "",
             "category_ids": ",".join(str(c.id) for c in article.categories.all()),

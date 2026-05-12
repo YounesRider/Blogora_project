@@ -7,6 +7,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Comment
 from apps.blog.models import Article
+from apps.notifications.views import create_notification
+from apps.notifications.models import Notification
 
 
 @login_required
@@ -35,6 +37,30 @@ def create_comment(request, article_id):
         content=content,
         parent=parent
     )
+
+    # Notify the article author about a new top-level comment
+    if parent is None and article.author != request.user:
+        article_author_profile = getattr(article.author, 'profile', None)
+        if getattr(article_author_profile, 'notify_article_comments', True):
+            create_notification(
+                recipient=article.author,
+                sender=request.user,
+                notification_type=Notification.Type.COMMENT,
+                message=f"{request.user.get_full_name() or request.user.username} commented on your article \"{article.title}\".",
+                content_object=comment
+            )
+
+    # Notify the parent commenter about a reply
+    if parent is not None and parent.author != request.user:
+        parent_profile = getattr(parent.author, 'profile', None)
+        if getattr(parent_profile, 'notify_comment_replies', True):
+            create_notification(
+                recipient=parent.author,
+                sender=request.user,
+                notification_type=Notification.Type.REPLY,
+                message=f"{request.user.get_full_name() or request.user.username} replied to your comment: \"{content[:100]}\".",
+                content_object=comment
+            )
     
     # Return HTMX response
     if request.headers.get('HX-Request'):
@@ -57,9 +83,20 @@ def create_comment(request, article_id):
 
 @login_required
 def delete_comment(request, comment_id):
-    """Supprimer son propre commentaire."""
-    comment = get_object_or_404(Comment, id=comment_id, author=request.user)
-    
+    """Supprimer son propre commentaire ou un commentaire si l'utilisateur est modérateur."""
+    comment = get_object_or_404(Comment, id=comment_id)
+    user_can_delete = comment.author == request.user
+
+    if not user_can_delete:
+        user_can_delete = (
+            request.user.role == 'moderator' and
+            getattr(getattr(request.user, 'moderator_profile', None), 'can_delete_comments', False)
+        )
+
+    if not user_can_delete:
+        messages.error(request, 'Vous n\'avez pas la permission de supprimer ce commentaire.')
+        return redirect(comment.article.get_absolute_url())
+
     if request.method == 'POST':
         article_url = comment.article.get_absolute_url()
         comment.delete()

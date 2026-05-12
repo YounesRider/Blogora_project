@@ -5,10 +5,7 @@
     <div class="container-fluid">
         <!-- Brand -->
         <a class="navbar-brand d-flex align-items-center fw-bold" href="/" style="color: var(--text-primary);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--brand-primary)" style="margin-right: 8px;">
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-            </svg>
-            {{ site_name }}
+            <img src="/media/logo.jpeg" alt="Blogora logo" class="navbar-logo me-2" width="60" height="60" />
         </a>
 
         <!-- Mobile toggle -->
@@ -78,10 +75,15 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" 
                        role="button" data-bs-toggle="dropdown" style="color: var(--text-secondary);">
+                        {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture }}" alt="{{ user.username }} avatar" 
+                             class="rounded-circle me-2" style="width: 28px; height: 28px; object-fit: cover;">
+                        {% else %}
                         <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" 
                              style="width: 28px; height: 28px; font-size: 0.75rem;">
                             {{ user.username|first_char|upper }}
                         </div>
+                        {% endif %}
                         <span class="d-none d-md-inline">{{ user.username }}</span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -95,6 +97,9 @@
                             <i class="bi bi-file-text me-2"></i> My Articles ({{ navbar_counts.total|default:0 }})
                         </a></li>
                         {% endif %}
+                        <li><a class="dropdown-item" href="{% url 'notifications:preferences' %}">
+                            <i class="bi bi-gear me-2"></i> Notification Settings
+                        </a></li>
                         {% if user.is_staff or user.role == 'admin' %}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'admin:dashboard' %}">

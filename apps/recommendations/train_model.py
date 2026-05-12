@@ -21,6 +21,9 @@ MODEL_PATH = Path(__file__).parent / "model" / "recommender.pkl"
 MODEL_PATH.parent.mkdir(exist_ok=True)
 
 
+MIN_INTERACTIONS = 10
+
+
 def train(n_components: int = 50) -> None:
     """
     Entraîne un modèle de filtrage collaboratif (SVD matricielle).
@@ -33,9 +36,24 @@ def train(n_components: int = 50) -> None:
         logger.warning("Pas assez de données pour entraîner le modèle.")
         return
 
+    positive_interactions = df[df["score"] > 0.15]
+    if len(positive_interactions) < MIN_INTERACTIONS:
+        logger.warning(
+            "Données d'entraînement insuffisantes (%d réelles interactions). "
+            "Au moins %d interactions sont recommandées.",
+            len(positive_interactions), MIN_INTERACTIONS
+        )
+        return
+
     # Encodage des IDs en indices entiers
     user_ids = df["user_id"].unique()
     article_ids = df["article_id"].unique()
+    if len(user_ids) < 2 or len(article_ids) < 2:
+        logger.warning(
+            "Pas assez d'utilisateurs ou d'articles uniques pour entraîner le modèle."
+        )
+        return
+
     user_idx = {uid: i for i, uid in enumerate(user_ids)}
     article_idx = {aid: i for i, aid in enumerate(article_ids)}
 

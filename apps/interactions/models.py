@@ -42,19 +42,6 @@ class Reaction(TimeStampedModel):
     
     def __str__(self):
         return f"{self.user.email} - {self.get_reaction_type_display()} - {self.article.title}"
-    
-    @property
-    def emoji(self):
-        """Retourne l'emoji correspondant au type de réaction."""
-        emoji_map = {
-            'love': '❤️',
-            'like': '👍',
-            'laugh': '😂',
-            'wow': '😮',
-            'sad': '😢',
-            'angry': '😠',
-        }
-        return emoji_map.get(self.reaction_type, '👍')
 
 
 class Like(TimeStampedModel):

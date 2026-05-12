@@ -2,6 +2,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import os
+import uuid
+from django.conf import settings
 
 from apps.blog.models import Article
 from apps.recommendations.predict import get_recommendations
@@ -86,3 +91,46 @@ def my_recommendations(request):
         for article in articles
     ]
     return Response({"results": payload})
+
+
+@require_POST
+def upload_inline_image(request):
+    """Upload an image for use in article content."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Authentication required'})
+    
+    if 'image' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No image file provided'})
+    
+    image_file = request.FILES['image']
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if image_file.content_type not in allowed_types:
+        return JsonResponse({'success': False, 'error': 'Unsupported image type'})
+    
+    # Validate file size (2MB)
+    if image_file.size > 2 * 1024 * 1024:
+        return JsonResponse({'success': False, 'error': 'Image too large (max 2MB)'})
+    
+    # Generate unique filename
+    ext = os.path.splitext(image_file.name)[1]
+    filename = f"{uuid.uuid4()}{ext}"
+    
+    # Create upload directory if it doesn't exist
+    upload_dir = os.path.join(settings.MEDIA_ROOT, 'article_images')
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Save file
+    file_path = os.path.join(upload_dir, filename)
+    with open(file_path, 'wb+') as destination:
+        for chunk in image_file.chunks():
+            destination.write(chunk)
+    
+    # Return URL
+    image_url = f"{settings.MEDIA_URL}article_images/{filename}"
+    return JsonResponse({
+        'success': True,
+        'url': image_url,
+        'filename': filename
+    })

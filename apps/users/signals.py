@@ -18,6 +18,9 @@ def handle_user_signup(request, user, **kwargs):
     """
     # Créer le profil utilisateur
     profile, created = UserProfile.objects.get_or_create(user=user)
+    if created and (user.role == User.Role.ADMIN or user.is_staff):
+        profile.auto_publish = True
+        profile.save()
     
     # Récupérer les catégories préférées depuis le formulaire
     preferred_categories = request.POST.getlist('preferred_categories')
@@ -39,7 +42,10 @@ def create_user_profile(sender, instance, created, **kwargs):
     Crée automatiquement un profil utilisateur lors de la création d'un utilisateur.
     """
     if created and not hasattr(instance, '_profile_created'):
-        UserProfile.objects.create(user=instance)
+        profile = UserProfile.objects.create(user=instance)
+        if instance.role == User.Role.ADMIN or instance.is_staff:
+            profile.auto_publish = True
+            profile.save()
         instance._profile_created = True
 
 

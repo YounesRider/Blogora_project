@@ -9,6 +9,8 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import Like, SavedArticle, Reaction
 from apps.blog.models import Article
 from apps.comments.models import Comment
+from apps.notifications.models import Notification
+from apps.notifications.views import create_notification
 
 
 @csrf_exempt
@@ -29,6 +31,16 @@ def like_article(request, article_id):
     if created:
         message = "Article liked!"
         liked = True
+        if article.author != request.user:
+            author_profile = getattr(article.author, 'profile', None)
+            if getattr(author_profile, 'notify_article_likes', True):
+                create_notification(
+                    recipient=article.author,
+                    sender=request.user,
+                    notification_type=Notification.Type.LIKE,
+                    message=f"{request.user.get_full_name() or request.user.username} liked your article \"{article.title}\".",
+                    content_object=article
+                )
     else:
         # Unlike - delete the like
         like.delete()
@@ -66,6 +78,16 @@ def like_comment(request, comment_id):
     if created:
         message = "Comment liked!"
         liked = True
+        if comment.author != request.user:
+            author_profile = getattr(comment.author, 'profile', None)
+            if getattr(author_profile, 'notify_comment_likes', True):
+                create_notification(
+                    recipient=comment.author,
+                    sender=request.user,
+                    notification_type=Notification.Type.LIKE,
+                    message=f"{request.user.get_full_name() or request.user.username} liked your comment.",
+                    content_object=comment
+                )
     else:
         # Unlike - delete the like
         like.delete()
@@ -100,6 +122,16 @@ def save_article(request, article_id):
     if created:
         message = "Article saved!"
         saved = True
+        if article.author != request.user:
+            author_profile = getattr(article.author, 'profile', None)
+            if getattr(author_profile, 'notify_article_saves', True):
+                create_notification(
+                    recipient=article.author,
+                    sender=request.user,
+                    notification_type=Notification.Type.ARTICLE_SAVED,
+                    message=f"{request.user.get_full_name() or request.user.username} saved your article \"{article.title}\".",
+                    content_object=article
+                )
     else:
         # Unsave - delete the saved article
         saved_article.delete()
@@ -202,41 +234,6 @@ def get_article_reactions(request, article_id):
         'save_count': save_count,
         'reaction_counts': reaction_counts,
         'user_reactions': user_reactions,
-    })
-
-
-@csrf_exempt
-@login_required
-@require_http_methods(["POST"])
-def batch_toggle_reaction(request, article_id):
-    """Handle multiple reactions at once (remove old one, add new one)."""
-    article = get_object_or_404(Article, pk=article_id)
-    reaction_type = request.POST.get('reaction_type')
-    
-    if not reaction_type or reaction_type not in [choice.value for choice in Reaction.ReactionType]:
-        return JsonResponse({'success': False, 'error': 'Invalid reaction type.'}, status=400)
-
-    # Remove all existing reactions by this user on this article
-    Reaction.objects.filter(user=request.user, article=article).delete()
-    
-    # Add new reaction
-    Reaction.objects.create(
-        user=request.user,
-        article=article,
-        reaction_type=reaction_type
-    )
-    
-    # Get updated counts
-    reaction_counts = {
-        rt.value: Reaction.objects.filter(article=article, reaction_type=rt.value).count()
-        for rt in Reaction.ReactionType
-    }
-    
-    return JsonResponse({
-        'success': True,
-        'message': 'Reaction updated!',
-        'reaction_counts': reaction_counts,
-        'user_reactions': [reaction_type],
     })
 
 

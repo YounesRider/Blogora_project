@@ -55,6 +55,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Actions</h5>
+                    {% if article.status == 'pending_review' %}
                     <form method="post" action="{% url 'admin:approve_article' article.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'admin:article_detail' article.pk %}">
@@ -65,10 +66,21 @@
                     <form method="post" action="{% url 'admin:reject_article' article.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'admin:article_detail' article.pk %}">
-                        <button type="submit" class="btn btn-danger w-100">
+                        <button type="submit" class="btn btn-warning w-100">
                             <i class="bi bi-x-circle"></i> Reject Article
                         </button>
                     </form>
+                    {% else %}
+                    <a href="{{ article.get_absolute_url }}" class="btn btn-outline-primary w-100 mb-2">
+                        <i class="bi bi-eye"></i> View Article
+                    </a>
+                    <form method="post" action="{% url 'admin:delete_article' article.pk %}" onsubmit="return confirm('Are you sure? This will delete the article and notify the author.');" class="mt-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="bi bi-trash"></i> Delete Article
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
         </div>

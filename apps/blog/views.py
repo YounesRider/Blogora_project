@@ -300,18 +300,63 @@ class ArticleCreateView(AuthorRequiredMixin, CreateView):
     template_name = 'blog/article_create.html'
     success_url = reverse_lazy('blog:my_articles')
     
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
     def form_valid(self, form):
-        form.instance.author = self.request.user
-        # Handle publish/submit for review logic
-        if form.cleaned_data['status'] == 'pending_review':
-            if self.request.user.profile.auto_publish:
+        is_admin = self.request.user.is_staff or self.request.user.role == 'admin'
+        target_author = self.request.user
+        if is_admin and form.cleaned_data.get('author'):
+            target_author = form.cleaned_data['author']
+        form.instance.author = target_author
+
+        auto_publish_privilege = bool(
+            (hasattr(self.request.user, 'profile') and self.request.user.profile.auto_publish) or is_admin
+        )
+        is_pending_review = form.cleaned_data['status'] == 'pending_review'
+        article_auto_publish = form.cleaned_data.get('auto_publish', False)
+
+        if is_pending_review:
+            if article_auto_publish and auto_publish_privilege:
                 form.instance.status = 'published'
                 messages.success(self.request, 'Your article has been published!')
             else:
                 messages.success(self.request, 'Your article has been submitted for review.')
+        elif form.cleaned_data['status'] == 'published':
+            messages.success(self.request, 'Your article has been published!')
         else:
             messages.success(self.request, 'Your article has been saved as draft.')
-        return super().form_valid(form)
+
+        form.instance.auto_publish = article_auto_publish
+        response = super().form_valid(form)
+
+        needs_review = is_pending_review and not (article_auto_publish and auto_publish_privilege)
+        if needs_review:
+            from apps.notifications.models import Notification
+            from apps.users.models import User, Moderator
+
+            reviewers = list(User.objects.filter(Q(is_staff=True) | Q(role='admin')).distinct())
+            reviewers += [moderator.user for moderator in Moderator.objects.filter(is_active=True).select_related('user')]
+
+            seen = set()
+            notifications = []
+            for recipient in reviewers:
+                if recipient.pk in seen:
+                    continue
+                seen.add(recipient.pk)
+                notifications.append(Notification(
+                    recipient=recipient,
+                    sender=self.request.user,
+                    notification_type=Notification.Type.ARTICLE_SUBMITTED,
+                    message=f'{self.request.user.username} submitted "{self.object.title}" for review.',
+                    content_object=self.object
+                ))
+            if notifications:
+                Notification.objects.bulk_create(notifications)
+
+        return response
     
     
     def get_context_data(self, **kwargs):
@@ -332,7 +377,33 @@ class ArticleUpdateView(AuthorRequiredMixin, OwnerRequiredMixin, UpdateView):
         """User can only edit their own articles."""
         return Article.objects.filter(author=self.request.user)
     
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
     def form_valid(self, form):
+        is_admin = self.request.user.is_staff or self.request.user.role == 'admin'
+        auto_publish_privilege = bool(
+            (hasattr(self.request.user, 'profile') and self.request.user.profile.auto_publish) or is_admin
+        )
+        article_auto_publish = form.cleaned_data.get('auto_publish', False)
+        original_status = self.object.status
+        requested_status = form.cleaned_data.get('status')
+
+        if original_status == 'published':
+            if requested_status == 'draft':
+                form.instance.status = 'draft'
+            else:
+                # Prevent published articles from reverting to review.
+                form.instance.status = 'published'
+        else:
+            if requested_status == 'pending_review' and article_auto_publish and auto_publish_privilege:
+                form.instance.status = 'published'
+            else:
+                form.instance.status = requested_status
+
+        form.instance.auto_publish = article_auto_publish
         messages.success(self.request, 'Your article has been updated successfully!')
         return super().form_valid(form)
     

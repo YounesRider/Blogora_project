@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Create article - Smart Blog AI{% endblock %}
+{% block title %}Create article - Blogora{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -40,6 +40,23 @@
                             </div>
                         </div>
 
+                        {% if form.author %}
+                        <div class="mb-3">
+                            <label for="{{ form.author.id_for_label }}" class="form-label">Author</label>
+                            {{ form.author }}
+                        </div>
+                        {% endif %}
+
+                        {% if form.auto_publish %}
+                        <div class="form-check mb-3">
+                            {{ form.auto_publish }}
+                            <label class="form-check-label" for="{{ form.auto_publish.id_for_label }}">
+                                {{ form.auto_publish.label }}
+                            </label>
+                            <div class="form-text">{{ form.auto_publish.help_text }}</div>
+                        </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label for="{{ form.cover_image.id_for_label }}" class="form-label">Cover image</label>
                             {{ form.cover_image }}
@@ -58,7 +75,15 @@
                             <a href="{% url 'blog:my_articles' %}" class="btn btn-outline-secondary">Cancel</a>
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-outline-primary" data-action="draft">Save draft</button>
-                                <button type="button" class="btn btn-warning" data-action="pending_review">Submit for review</button>
+                                {% if user.profile.auto_publish or user.is_staff or user.role == 'admin' %}
+                                <button type="button" class="btn btn-success" data-action="pending_review">
+                                    <i class="bi bi-upload"></i> Publish
+                                </button>
+                                {% else %}
+                                <button type="button" class="btn btn-warning" data-action="pending_review">
+                                    <i class="bi bi-send"></i> Submit for review
+                                </button>
+                                {% endif %}
                             </div>
                         </div>
                     </form>
@@ -85,6 +110,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 ["bold", "italic", "underline", "strike"],
                 [{ list: "ordered" }, { list: "bullet" }],
                 ["link", "blockquote", "code-block"],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'align': [] }],
+                ["image"],
                 ["clean"]
             ]
         }
@@ -93,6 +121,73 @@ document.addEventListener("DOMContentLoaded", function () {
     if (contentField.value) {
         quill.root.innerHTML = contentField.value;
     }
+
+    // Image upload functionality
+    const imageInput = document.createElement('input');
+    imageInput.setAttribute('type', 'file');
+    imageInput.setAttribute('accept', 'image/*');
+    imageInput.style.display = 'none';
+    document.body.appendChild(imageInput);
+
+    quill.getModule('toolbar').addHandler('image', function() {
+        imageInput.click();
+    });
+
+    imageInput.addEventListener('change', function() {
+        const file = imageInput.files[0];
+        if (file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Unsupported image type. Please select JPEG, PNG, GIF, or WebP.');
+                return;
+            }
+
+            // Validate file size (2MB for inline images)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Image file too large. Please select an image smaller than 2MB.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            // Show loading indicator
+            const range = quill.getSelection();
+            quill.insertText(range.index, 'Uploading image...', 'user');
+            
+            const fetchUrl = '/api/v1/upload-inline-image/';
+            const rangeIndex = range ? range.index : quill.getLength();
+
+            fetch(fetchUrl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove loading text and insert image
+                    quill.deleteText(rangeIndex, 'Uploading image...'.length);
+                    quill.insertEmbed(rangeIndex, 'image', data.url);
+                    quill.setSelection(rangeIndex + 1);
+                } else {
+                    // Remove loading text and show error
+                    quill.deleteText(rangeIndex, 'Uploading image...'.length);
+                    alert('Failed to upload image: ' + data.error);
+                }
+            })
+            .catch(error => {
+                // Remove loading text and show error
+                quill.deleteText(rangeIndex, 'Uploading image...'.length);
+                alert('Failed to upload image. Please try again.');
+                console.error('Image upload error:', error);
+            });
+        }
+    });
 
     const form = document.getElementById("article-form");
     const statusField = document.getElementById("{{ form.status.id_for_label }}");

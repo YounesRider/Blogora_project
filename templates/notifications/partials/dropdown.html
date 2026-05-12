@@ -1,54 +1,147 @@
 {% load static %}
 {% load core_filters %}
 
-<div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 350px; max-width: 400px;">
-    <div class="dropdown-header d-flex justify-content-between align-items-center">
+<div class="p-0" style="min-width: 400px; max-width: 450px;">
+    <div class="dropdown-header d-flex justify-content-between align-items-center px-3 py-2">
         <span class="fw-bold">Notifications</span>
         {% if unread_count > 0 %}
-        <span class="badge bg-primary">{{ unread_count }}</span>
+        <div class="d-flex gap-1 align-items-center">
+            <button class="btn btn-sm btn-outline-primary"
+                    hx-post="{% url 'notifications:mark_all_read' %}"
+                    hx-target="#notifications-dropdown"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    title="Mark all as read">
+                <i class="bi bi-check-all"></i>
+            </button>
+            <span class="badge bg-primary">{{ unread_count }}</span>
+        </div>
         {% endif %}
     </div>
-    
+
     {% if notifications %}
-    <div class="list-group" style="max-height: 400px; overflow-y: auto;">
+    <div class="list-group" style="max-height: 500px; overflow-y: auto;">
         {% for notification in notifications %}
-        <a href="{% if notification.content_object %}{{ notification.content_object.get_absolute_url }}{% else %}#{% endif %}" 
-           class="list-group-item list-group-item-action {% if not notification.is_read %}bg-light{% endif %}"
-           hx-post="{% url 'notifications:mark_read' notification.pk %}"
-           hx-trigger="click"
-           hx-swap="none">
+        <div id="notification-{{ notification.pk }}" class="list-group-item list-group-item-action border-0 {% if not notification.is_read %}bg-light{% endif %}"
+             style="cursor: pointer;"
+             onclick="handleNotificationClick({{ notification.pk }}, '{{ notification.content_object.get_absolute_url|default:'#'|escapejs }}')">
             <div class="d-flex">
                 {% if notification.sender %}
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 flex-shrink-0" 
-                     style="width: 32px; height: 32px; font-size: 0.75rem;">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                     style="width: 36px; height: 36px; font-size: 0.8rem;">
                     {{ notification.sender.username|first_char|upper }}
                 </div>
                 {% endif %}
                 <div class="flex-grow-1">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <p class="mb-1 small">{{ notification.message|truncatechars:60 }}</p>
-                            <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center mb-1">
+                                <small class="fw-bold text-primary me-2">{{ notification.get_notification_type_display }}</small>
+                                <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                            </div>
+                            <p class="mb-1 small lh-sm">{{ notification.message }}</p>
+                            {% if notification.content_object %}
+                            <small class="text-muted">
+                                {% if notification.content_object|classname == 'Article' %}
+                                Article: {{ notification.content_object.title|truncatechars:30 }}
+                                {% elif notification.content_object|classname == 'Comment' %}
+                                Comment on: {{ notification.content_object.article.title|truncatechars:25 }}
+                                {% else %}
+                                View details
+                                {% endif %}
+                            </small>
+                            {% endif %}
                         </div>
-                        {% if not notification.is_read %}
-                        <span class="badge bg-primary rounded-pill p-1" style="width: 8px; height: 8px;"></span>
-                        {% endif %}
+                        <div class="d-flex flex-column gap-1 ms-2">
+                            {% if not notification.is_read %}
+                            <span class="badge bg-primary rounded-pill align-self-start" style="width: 8px; height: 8px;"></span>
+                            {% endif %}
+                            <button class="btn btn-sm btn-outline-danger p-1"
+                                    onclick="event.stopPropagation(); deleteNotification({{ notification.pk }})"
+                                    title="Delete notification">
+                                <i class="bi bi-x" style="font-size: 0.7rem;"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </a>
+        </div>
         {% endfor %}
     </div>
-    
-    <div class="dropdown-footer text-center p-2">
+
+    {% if recommended_articles %}
+    <div class="border-top px-3 py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold">Recommended for you</span>
+            <a href="{% url 'recommendations:dashboard' %}" class="small">See all</a>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for article in recommended_articles %}
+            <a href="{{ article.get_absolute_url }}" class="list-group-item list-group-item-action py-2 small">
+                <strong>{{ article.title|truncatechars:40 }}</strong>
+                <div class="text-muted">{{ article.author.username }} · {{ article.created_at|timesince }} ago</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="dropdown-footer text-center p-2 border-top">
         <a href="{% url 'notifications:list' %}" class="btn btn-sm btn-outline-primary w-100">
-            View All Notifications
+            <i class="bi bi-bell"></i> View All Notifications
         </a>
     </div>
     {% else %}
     <div class="text-center p-4">
         <i class="bi bi-bell text-muted fs-3"></i>
-        <p class="text-muted mb-0 small">No notifications</p>
+        <p class="text-muted mb-2 small">No notifications yet.</p>
+        <p class="text-muted small">We'll let you know when something important happens.</p>
+        <a href="{% url 'recommendations:dashboard' %}" class="btn btn-sm btn-primary mt-2">Explore Recommendations</a>
+    </div>
+    {% if recommended_articles %}
+    <div class="border-top px-3 py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold">Recommended for you</span>
+            <a href="{% url 'recommendations:dashboard' %}" class="small">See all</a>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for article in recommended_articles %}
+            <a href="{{ article.get_absolute_url }}" class="list-group-item list-group-item-action py-2 small">
+                <strong>{{ article.title|truncatechars:40 }}</strong>
+                <div class="text-muted">{{ article.author.username }} · {{ article.created_at|timesince }} ago</div>
+            </a>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
+    {% endif %}
 </div>
+
+<script>
+function handleNotificationClick(notificationId, url) {
+    htmx.ajax('POST', `/notifications/mark-read/${notificationId}/`);
+
+    if (url && url !== '#') {
+        setTimeout(() => window.location.href = url, 100);
+    }
+}
+
+function deleteNotification(notificationId) {
+    htmx.ajax('POST', `/notifications/delete/${notificationId}/`, {
+        target: `#notification-${notificationId}`,
+        swap: 'outerHTML delete'
+    });
+}
+
+(function updateNotificationBadge() {
+    const badge = document.querySelector('#notification-badge');
+    if (!badge) return;
+    const count = {{ unread_count|default:0 }};
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+})();
+</script>

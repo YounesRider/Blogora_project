@@ -10,6 +10,7 @@ urlpatterns = [
     path('articles/<int:pk>/', views.AdminArticleDetailView.as_view(), name='article_detail'),
     path('articles/<int:pk>/approve/', views.admin_approve_article, name='approve_article'),
     path('articles/<int:pk>/reject/', views.admin_reject_article, name='reject_article'),
+    path('articles/<int:pk>/delete/', views.admin_delete_article, name='delete_article'),
     
     # Admin Users Management
     path('users/', views.AdminUsersView.as_view(), name='users'),
@@ -32,6 +33,9 @@ urlpatterns = [
     path('moderation/articles/<int:pk>/approve/', views.moderator_approve_article, name='moderator_approve_article'),
     path('moderation/articles/<int:pk>/reject/', views.moderator_reject_article, name='moderator_reject_article'),
     path('moderation/articles/<int:pk>/delete/', views.moderator_delete_article, name='moderator_delete_article'),
+    path('moderation/articles/bulk-approve/', views.moderator_bulk_approve_articles, name='moderator_bulk_approve_articles'),
+    path('moderation/articles/bulk-reject/', views.moderator_bulk_reject_articles, name='moderator_bulk_reject_articles'),
+    path('moderation/articles/bulk-delete/', views.moderator_bulk_delete_articles, name='moderator_bulk_delete_articles'),
     path('moderation/comments/', views.ModeratorCommentsView.as_view(), name='moderation_comments'),
     path('moderation/comments/<int:pk>/approve/', views.moderator_approve_comment, name='moderator_approve_comment'),
     path('moderation/comments/<int:pk>/delete/', views.moderator_delete_comment, name='moderator_delete_comment'),

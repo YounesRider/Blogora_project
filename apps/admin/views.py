@@ -12,6 +12,25 @@ from apps.blog.models import Article
 from apps.users.models import User, Follow, Moderator
 from apps.comments.models import Comment
 from apps.interactions.models import Like
+from apps.notifications.models import Notification
+
+
+def notify_admins_of_moderator_action(actor, action, article):
+    admin_recipients = User.objects.filter(
+        Q(is_staff=True) | Q(role='admin')
+    ).exclude(pk=actor.pk)
+    notifications = [
+        Notification(
+            recipient=recipient,
+            sender=actor,
+            notification_type=Notification.Type.MODERATOR_ACTION,
+            message=f'{actor.username} {action} the article "{article.title}".',
+            content_object=article
+        )
+        for recipient in admin_recipients
+    ]
+    if notifications:
+        Notification.objects.bulk_create(notifications)
 
 
 class AdminDashboardView(AdminRequiredMixin, LoginRequiredMixin, ListView):
@@ -258,6 +277,36 @@ def admin_reject_article(request, pk):
 
 
 @login_required
+def admin_delete_article(request, pk):
+    """Delete an article from the admin interface and notify the author."""
+    if not request.user.is_staff and request.user.role != 'admin':
+        messages.error(request, 'You do not have permission to delete articles.')
+        return redirect('admin:dashboard')
+
+    article = get_object_or_404(Article, pk=pk)
+    if request.method == 'POST':
+        title = article.title
+        author = article.author
+        article.delete()
+        messages.success(request, f'Article "{title}" has been deleted.')
+
+        from apps.notifications.models import Notification
+        Notification.objects.create(
+            recipient=author,
+            sender=request.user,
+            notification_type=Notification.Type.ARTICLE_REJECTED,
+            message=f'Your article "{title}" has been removed by an administrator.',
+            content_object=article
+        )
+
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+        if next_url:
+            return redirect(next_url)
+
+    return redirect('admin:articles')
+
+
+@login_required
 def admin_toggle_user_role(request, pk):
     """Toggle user role between user and author."""
     if not request.user.is_staff and request.user.role != 'admin':
@@ -399,6 +448,22 @@ def admin_create_moderator(request, pk):
                 created_by=request.user
             )
             messages.success(request, f'{user.username} has been promoted to moderator.')
+
+            admin_recipients = User.objects.filter(
+                Q(is_staff=True) | Q(role='admin')
+            ).exclude(pk=request.user.pk)
+            notifications = [
+                Notification(
+                    recipient=recipient,
+                    sender=request.user,
+                    notification_type=Notification.Type.MODERATOR_CREATED,
+                    message=f'{request.user.username} promoted {user.username} to moderator.',
+                    content_object=user
+                )
+                for recipient in admin_recipients
+            ]
+            if notifications:
+                Notification.objects.bulk_create(notifications)
         except Exception as e:
             messages.error(request, f'Error creating moderator: {str(e)}')
     
@@ -550,7 +615,6 @@ def moderator_approve_article(request, pk):
         messages.success(request, f'Article "{article.title}" has been approved.')
         
         # Create notification for author
-        from apps.notifications.models import Notification
         Notification.objects.create(
             recipient=article.author,
             sender=request.user,
@@ -558,6 +622,7 @@ def moderator_approve_article(request, pk):
             message=f'Your article "{article.title}" has been approved and published!',
             content_object=article
         )
+        notify_admins_of_moderator_action(request.user, 'approved', article)
         
         next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
         if next_url:
@@ -595,7 +660,6 @@ def moderator_reject_article(request, pk):
         messages.success(request, f'Article "{article.title}" has been rejected.')
         
         # Create notification for author
-        from apps.notifications.models import Notification
         Notification.objects.create(
             recipient=article.author,
             sender=request.user,
@@ -603,6 +667,7 @@ def moderator_reject_article(request, pk):
             message=f'Your article "{article.title}" has been rejected. Please review and resubmit.',
             content_object=article
         )
+        notify_admins_of_moderator_action(request.user, 'rejected', article)
         
         next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
         if next_url:
@@ -703,6 +768,143 @@ def moderator_delete_comment(request, pk):
             moderator.save()
         
         messages.success(request, 'Comment has been deleted.')
-        return redirect('moderation:comments')
+        return redirect('admin:moderation_comments')
     
-    return redirect('moderation:comments')
+    return redirect('admin:moderation_comments')
+
+
+# ============================================================================
+# BULK MODERATION ACTIONS
+# ============================================================================
+
+@login_required
+def moderator_bulk_approve_articles(request):
+    """Bulk approve multiple articles."""
+    if not (request.user.role in ['moderator', 'admin']):
+        messages.error(request, 'You do not have permission to approve articles.')
+        return redirect('dashboard')
+    
+    # Check moderator permissions
+    if request.user.role == 'moderator' and hasattr(request.user, 'moderator_profile'):
+        if not request.user.moderator_profile.can_review_articles:
+            messages.error(request, 'You do not have permission to review articles.')
+            return redirect('admin:moderation_articles')
+    
+    if request.method == 'POST':
+        article_ids = request.POST.get('article_ids', '').split(',')
+        article_ids = [int(id) for id in article_ids if id.strip()]
+        
+        if not article_ids:
+            messages.error(request, 'No articles selected.')
+            return redirect('admin:moderation_articles')
+        
+        articles = Article.objects.filter(pk__in=article_ids, status='pending_review')
+        approved_count = 0
+        
+        for article in articles:
+            article.status = 'published'
+            article.published_at = timezone.now()
+            article.save()
+            approved_count += 1
+            
+            # Create notification for author
+            Notification.objects.create(
+                recipient=article.author,
+                sender=request.user,
+                notification_type=Notification.Type.ARTICLE_APPROVED,
+                message=f'Your article "{article.title}" has been approved and published!',
+                content_object=article
+            )
+            notify_admins_of_moderator_action(request.user, 'approved', article)
+        
+        # Update moderator stats
+        if hasattr(request.user, 'moderator_profile'):
+            moderator = request.user.moderator_profile
+            moderator.articles_reviewed += approved_count
+            moderator.articles_approved += approved_count
+            moderator.save()
+        
+        messages.success(request, f'{approved_count} article{"s" if approved_count != 1 else ""} approved successfully.')
+    
+    return redirect('admin:moderation_articles')
+
+
+@login_required
+def moderator_bulk_reject_articles(request):
+    """Bulk reject multiple articles."""
+    if not (request.user.role in ['moderator', 'admin']):
+        messages.error(request, 'You do not have permission to reject articles.')
+        return redirect('dashboard')
+    
+    # Check moderator permissions
+    if request.user.role == 'moderator' and hasattr(request.user, 'moderator_profile'):
+        if not request.user.moderator_profile.can_review_articles:
+            messages.error(request, 'You do not have permission to review articles.')
+            return redirect('admin:moderation_articles')
+    
+    if request.method == 'POST':
+        article_ids = request.POST.get('article_ids', '').split(',')
+        article_ids = [int(id) for id in article_ids if id.strip()]
+        
+        if not article_ids:
+            messages.error(request, 'No articles selected.')
+            return redirect('admin:moderation_articles')
+        
+        articles = Article.objects.filter(pk__in=article_ids, status='pending_review')
+        rejected_count = 0
+        
+        for article in articles:
+            article.status = 'rejected'
+            article.save()
+            rejected_count += 1
+            
+            # Create notification for author
+            Notification.objects.create(
+                recipient=article.author,
+                sender=request.user,
+                notification_type=Notification.Type.ARTICLE_REJECTED,
+                message=f'Your article "{article.title}" has been rejected. Please review and resubmit.',
+                content_object=article
+            )
+            notify_admins_of_moderator_action(request.user, 'rejected', article)
+        
+        # Update moderator stats
+        if hasattr(request.user, 'moderator_profile'):
+            moderator = request.user.moderator_profile
+            moderator.articles_reviewed += rejected_count
+            moderator.articles_rejected += rejected_count
+            moderator.save()
+        
+        messages.success(request, f'{rejected_count} article{"s" if rejected_count != 1 else ""} rejected successfully.')
+    
+    return redirect('admin:moderation_articles')
+
+
+@login_required
+def moderator_bulk_delete_articles(request):
+    """Bulk delete multiple articles."""
+    if not (request.user.role in ['moderator', 'admin']):
+        messages.error(request, 'You do not have permission to delete articles.')
+        return redirect('dashboard')
+    
+    # Check moderator permissions
+    if request.user.role == 'moderator' and hasattr(request.user, 'moderator_profile'):
+        if not request.user.moderator_profile.can_delete_articles:
+            messages.error(request, 'You do not have permission to delete articles.')
+            return redirect('admin:moderation_articles')
+    
+    if request.method == 'POST':
+        article_ids = request.POST.get('article_ids', '').split(',')
+        article_ids = [int(id) for id in article_ids if id.strip()]
+        
+        if not article_ids:
+            messages.error(request, 'No articles selected.')
+            return redirect('admin:moderation_articles')
+        
+        articles = Article.objects.filter(pk__in=article_ids, status='pending_review')
+        deleted_count = articles.count()
+        articles.delete()
+        
+        messages.success(request, f'{deleted_count} article{"s" if deleted_count != 1 else ""} deleted successfully.')
+    
+    return redirect('admin:moderation_articles')

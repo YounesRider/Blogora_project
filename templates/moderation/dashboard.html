@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% load admin_filters %}
+{% load static %}
+
+{% block title %}Moderation Dashboard - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Moderation Dashboard</h1>
+            <p class="text-muted mb-0">Review content and moderate the platform</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admin:moderation_articles' %}" class="btn btn-outline-primary">
+                <i class="bi bi-file-text"></i> Articles
+            </a>
+            <a href="{% url 'admin:moderation_comments' %}" class="btn btn-outline-primary">
+                <i class="bi bi-chat"></i> Comments
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ pending_articles|length }}</h4>
+                            <p class="mb-0">Pending Articles</p>
+                        </div>
+                        <i class="bi bi-clock-history fs-1 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ unapproved_comments|length }}</h4>
+                            <p class="mb-0">Unapproved Comments</p>
+                        </div>
+                        <i class="bi bi-chat-dots fs-1 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if articles_reviewed is defined %}
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ articles_reviewed }}</h4>
+                            <p class="mb-0">Articles Reviewed</p>
+                        </div>
+                        <i class="bi bi-check-circle fs-1 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">{{ comments_deleted }}</h4>
+                            <p class="mb-0">Comments Deleted</p>
+                        </div>
+                        <i class="bi bi-trash fs-1 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Pending Articles -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Pending Articles</h5>
+                </div>
+                <div class="card-body">
+                    {% for article in pending_articles %}
+                    <div class="d-flex justify-content-between align-items-start mb-3 pb-3 border-bottom">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                <a href="{% url 'admin:article_detail' article.pk %}" class="text-decoration-none">
+                                    {{ article.title|truncatewords:8 }}
+                                </a>
+                            </h6>
+                            <small class="text-muted">
+                                by {{ article.author.username }} • {{ article.created_at|date:"M d, Y" }}
+                            </small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <form method="post" action="{% url 'admin:moderator_approve_article' article.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success btn-sm" title="Approve">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'admin:moderator_reject_article' article.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm" title="Reject">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No pending articles</p>
+                    {% endfor %}
+                </div>
+                {% if pending_articles %}
+                <div class="card-footer">
+                    <a href="{% url 'admin:moderation_articles' %}" class="btn btn-outline-primary btn-sm">
+                        View All Pending Articles
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Unapproved Comments -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Unapproved Comments</h5>
+                </div>
+                <div class="card-body">
+                    {% for comment in unapproved_comments %}
+                    <div class="d-flex justify-content-between align-items-start mb-3 pb-3 border-bottom">
+                        <div class="flex-grow-1">
+                            <p class="mb-1">{{ comment.content|truncatewords:15 }}</p>
+                            <small class="text-muted">
+                                by {{ comment.author.username }} on "{{ comment.article.title|truncatewords:5 }}"
+                            </small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <form method="post" action="{% url 'admin:moderator_approve_comment' comment.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success btn-sm" title="Approve">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'admin:moderator_delete_comment' comment.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No unapproved comments</p>
+                    {% endfor %}
+                </div>
+                {% if unapproved_comments %}
+                <div class="card-footer">
+                    <a href="{% url 'admin:moderation_comments' %}" class="btn btn-outline-primary btn-sm">
+                        View All Comments
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

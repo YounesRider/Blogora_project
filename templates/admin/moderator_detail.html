@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% load admin_filters %}
+{% load static %}
+
+{% block title %}Moderator Details - {{ user_obj.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Moderator: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+            <p class="text-muted mb-0">Moderator ID: {{ moderator.pk }} | Created: {{ moderator.created_at|date:"M d, Y" }}</p>
+        </div>
+        <a href="{% url 'admin:moderators' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Moderators
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Moderator Info -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Account Information</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Username:</strong></p>
+                            <p class="text-muted">{{ user_obj.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Email:</strong></p>
+                            <p class="text-muted"><a href="mailto:{{ user_obj.email }}">{{ user_obj.email }}</a></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Status:</strong></p>
+                            <p>
+                                <span class="badge {% if moderator.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if moderator.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Created By:</strong></p>
+                            <p class="text-muted">
+                                {% if moderator.created_by %}
+                                    {{ moderator.created_by.username }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Moderation Statistics -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Moderation Statistics</h5>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ moderator.articles_reviewed }}</h4>
+                                <small class="text-muted">Articles Reviewed</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ moderator.articles_approved }}</h4>
+                                <small class="text-muted">Articles Approved</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <h4 class="text-warning">{{ moderator.articles_rejected }}</h4>
+                                <small class="text-muted">Articles Rejected</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <h4 class="text-danger">{{ moderator.comments_deleted }}</h4>
+                                <small class="text-muted">Comments Deleted</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permissions -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Permissions</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Review Articles</span>
+                                <form method="post" action="{% url 'admin:toggle_moderator_permission' moderator.pk 'review_articles' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm {% if moderator.can_review_articles %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                                        {% if moderator.can_review_articles %}✓{% else %}✗{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Delete Articles</span>
+                                <form method="post" action="{% url 'admin:toggle_moderator_permission' moderator.pk 'delete_articles' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm {% if moderator.can_delete_articles %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                                        {% if moderator.can_delete_articles %}✓{% else %}✗{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Delete Comments</span>
+                                <form method="post" action="{% url 'admin:toggle_moderator_permission' moderator.pk 'delete_comments' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm {% if moderator.can_delete_comments %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                                        {% if moderator.can_delete_comments %}✓{% else %}✗{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Manage Moderators</span>
+                                <form method="post" action="{% url 'admin:toggle_moderator_permission' moderator.pk 'manage_moderators' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm {% if moderator.can_manage_other_moderators %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                                        {% if moderator.can_manage_other_moderators %}✓{% else %}✗{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Actions -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Actions</h5>
+                    
+                    <form method="post" action="{% url 'admin:toggle_moderator_active' moderator.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn {% if moderator.is_active %}btn-warning{% else %}btn-success{% endif %} w-100 btn-sm mb-2">
+                            <i class="bi bi-toggle-{% if moderator.is_active %}off{% else %}on{% endif %}"></i> 
+                            {% if moderator.is_active %}Deactivate{% else %}Activate{% endif %} Moderator
+                        </button>
+                    </form>
+
+                    <form method="post" action="{% url 'admin:delete_moderator' moderator.pk %}" onsubmit="return confirm('Demote this moderator to regular user?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger w-100 btn-sm">
+                            <i class="bi bi-person-dash"></i> Demote to User
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="alert alert-info">
+                <small>
+                    <i class="bi bi-info-circle"></i> This moderator was created on {{ moderator.created_at|date:"M d, Y at H:i" }}.
+                    {% if moderator.created_by %}
+                        Created by: {{ moderator.created_by.username }}
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

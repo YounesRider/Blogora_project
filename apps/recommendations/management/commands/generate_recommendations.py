@@ -1,92 +1,90 @@
+"""
+Management command to generate recommendations with scores.
+Usage: python manage.py generate_recommendations [--user-id=<id>] [--username=<username>] [--top-k=10]
+       python manage.py generate_recommendations --username test_recommender_user --csv
+"""
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from apps.recommendations.models import RecommendationScore
-from apps.recommendations.predict import get_recommendations
+import joblib
+import numpy as np
+from pathlib import Path
+
 from apps.users.models import User
-
-
-def generate_user_recommendations(user_id: int, top_k: int = 50) -> int:
-    user = User.objects.filter(id=user_id).first()
-    if not user:
-        return 0
-
-    RecommendationScore.objects.filter(user=user).delete()
-    recommended_ids = get_recommendations(user.id, top_k=top_k, exclude_seen=True)
-    scores = []
-    for rank, article_id in enumerate(recommended_ids):
-        score = 1.0 - (rank / max(top_k, 1))
-        scores.append(RecommendationScore(user=user, article_id=article_id, score=score))
-    RecommendationScore.objects.bulk_create(scores, ignore_conflicts=True)
-    return len(scores)
+from apps.blog.models import Article
 
 
 class Command(BaseCommand):
-    help = 'Génère les scores de recommandation pour tous les utilisateurs'
+    help = 'Generate predictions with scores for a user (id,score format)'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--batch-size',
-            type=int,
-            default=100,
-            help='Taille du batch pour traiter les utilisateurs (default: 100)'
-        )
-        parser.add_argument(
-            '--top-k',
-            type=int,
-            default=50,
-            help='Nombre de recommandations par utilisateur (default: 50)'
-        )
+        parser.add_argument('--user-id', type=int, help='User ID to get recommendations for')
+        parser.add_argument('--username', type=str, help='Username to get recommendations for')
+        parser.add_argument('--top-k', type=int, default=10, help='Number of recommendations')
+        parser.add_argument('--csv', action='store_true', help='Output as CSV format only (no header)')
 
     def handle(self, *args, **options):
-        batch_size = options['batch_size']
-        top_k = options['top_k']
+        # Get user
+        user_id = options.get('user_id')
+        username = options.get('username')
+        top_k = options.get('top_k', 10)
+        csv_format = options.get('csv', False)
         
-        self.stdout.write(f' Génération des recommandations (top-{top_k}) par batch de {batch_size}...')
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                user_id = user.id
+            except User.DoesNotExist:
+                self.stdout.write(self.style.ERROR(f'User not found: {username}'))
+                return
+        elif user_id:
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                self.stdout.write(self.style.ERROR(f'User not found: {user_id}'))
+                return
+        else:
+            self.stdout.write(self.style.ERROR('Provide --user-id or --username'))
+            return
         
-        # Supprimer les anciens scores
-        deleted_count = RecommendationScore.objects.all().delete()[0]
-        self.stdout.write(f'  Supprimé {deleted_count} anciens scores')
+        # Load model
+        MODEL_PATH = Path(__file__).parent.parent.parent / "model" / "recommender.pkl"
         
-        users = User.objects.all()
-        total_users = users.count()
-        processed = 0
+        if not MODEL_PATH.exists():
+            self.stdout.write(self.style.ERROR(f'Model not found: {MODEL_PATH}'))
+            return
         
-        for i in range(0, total_users, batch_size):
-            batch = users[i:i + batch_size]
+        model = joblib.load(MODEL_PATH)
+        
+        # Get predictions
+        user_idx = model["user_idx"]
+        
+        if user_id not in user_idx:
+            if not csv_format:
+                self.stdout.write(self.style.WARNING(f'User {user.username} not in trained model. Using fallback.'))
+            # Fallback: recommend popular articles
+            articles = Article.objects.filter(status='published').order_by('-view_count')[:top_k]
+            recommendations = [(a.id, 0.0) for a in articles]
+        else:
+            # Get user vector and compute scores
+            i = user_idx[user_id]
+            user_vec = model["user_factors"][i]
+            scores = model["article_factors"] @ user_vec
             
-            for user in batch:
-                try:
-                    # Obtenir les recommandations
-                    recommended_ids = get_recommendations(
-                        user.id, 
-                        top_k=top_k, 
-                        exclude_seen=True
-                    )
-                    
-                    # Créer les scores
-                    scores = []
-                    for rank, article_id in enumerate(recommended_ids):
-                        # Score décroissant basé sur le rang
-                        score = 1.0 - (rank / top_k)
-                        scores.append(RecommendationScore(
-                            user=user,
-                            article_id=article_id,
-                            score=score
-                        ))
-                    
-                    # Création en masse
-                    RecommendationScore.objects.bulk_create(scores, ignore_conflicts=True)
-                    processed += 1
-                    
-                except Exception as e:
-                    self.stdout.write(
-                        self.style.WARNING(f'⚠️ Erreur utilisateur {user.id}: {e}')
-                    )
+            # Get top k
+            top_indices = np.argsort(scores)[::-1][:top_k]
+            article_ids = model["article_ids"]
             
-            self.stdout.write(
-                f'📊 Traités {min(i + batch_size, total_users)}/{total_users} utilisateurs...'
-            )
+            recommendations = [
+                (int(article_ids[idx]), float(scores[idx]))
+                for idx in top_indices
+            ]
         
-        self.stdout.write(
-            self.style.SUCCESS(f'✅ Terminé ! {processed} utilisateurs traités')
-        )
+        # Output
+        if csv_format:
+            for article_id, score in recommendations:
+                self.stdout.write(f"{article_id},{score:.6f}")
+        else:
+            self.stdout.write(f"\nRecommendations for {user.username} (top {top_k}):\n")
+            self.stdout.write("id,score")
+            for article_id, score in recommendations:
+                self.stdout.write(f"{article_id},{score:.6f}")
+            self.stdout.write(f"\nTotal: {len(recommendations)} recommendations")

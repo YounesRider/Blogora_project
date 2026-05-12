@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% load admin_filters %}
+{% load static %}
+
+{% block title %}Manage Moderators - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Manage Moderators</h1>
+            <p class="text-muted mb-0">{{ total_moderators }} total moderators • {{ active_moderators }} active</p>
+        </div>
+        <a href="{% url 'admin:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search Moderators</label>
+                    <input type="text" name="search" id="search" class="form-control" 
+                           value="{{ search }}" placeholder="Search by username or email...">
+                </div>
+                <div class="col-md-4">
+                    <label for="active_only" class="form-label">Filter</label>
+                    <select name="active_only" id="active_only" class="form-select">
+                        <option value="">All Moderators</option>
+                        <option value="true" {% if active_only == 'true' %}selected{% endif %}>Active Only</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Moderators Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Moderator</th>
+                            <th>Status</th>
+                            <th>Articles Reviewed</th>
+                            <th>Comments Deleted</th>
+                            <th>Created By</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for moderator in moderators %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" 
+                                         style="width: 40px; height: 40px;">
+                                        {{ moderator.user.username|first_char|upper }}
+                                    </div>
+                                    <div>
+                                        <a href="{% url 'admin:moderator_detail' moderator.pk %}" class="text-decoration-none fw-bold">
+                                            {{ moderator.user.username }}
+                                        </a>
+                                        <small class="text-muted d-block">{{ moderator.user.email }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge {% if moderator.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if moderator.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ moderator.articles_reviewed }}</span>
+                                <small class="text-muted">({{ moderator.articles_approved }} ✓ {{ moderator.articles_rejected }} ✗)</small>
+                            </td>
+                            <td>{{ moderator.comments_deleted }}</td>
+                            <td>
+                                {% if moderator.created_by %}
+                                    {{ moderator.created_by.username }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ moderator.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'admin:moderator_detail' moderator.pk %}" class="btn btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                    <form method="post" action="{% url 'admin:delete_moderator' moderator.pk %}" style="display:inline;" 
+                                          onsubmit="return confirm('Demote this moderator?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox"></i> No moderators found
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <nav class="mt-4" aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{{ search_param }}{{ filter_param }}">First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{{ search_param }}{{ filter_param }}">Previous</a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item active">
+                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{{ search_param }}{{ filter_param }}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{{ search_param }}{{ filter_param }}">Last</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

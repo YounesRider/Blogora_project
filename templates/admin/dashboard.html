@@ -216,7 +216,7 @@
                         <div class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="flex-grow-1">
-                                    <a href="{% url 'admin:article_detail' comment.article.pk %}" class="text-decoration-none">
+                                    <a href="{{ comment.article.get_absolute_url }}" class="text-decoration-none">
                                         {{ comment.content|truncatechars:40 }}
                                     </a>
                                     <small class="text-muted d-block">

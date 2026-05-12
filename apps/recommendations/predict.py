@@ -6,6 +6,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+from django.db import models
 
 logger = logging.getLogger(__name__)
 MODEL_PATH = Path(__file__).parent / "model" / "recommender.pkl"
@@ -63,6 +64,15 @@ def get_recommendations(user_id: int, top_k: int = 10, exclude_seen: bool = True
 
     article_ids = model["article_ids"]
 
+    # Add bonus for articles with more comments (engagement indicator)
+    from .feature_engineering import compute_article_features
+    article_features = compute_article_features()
+    comment_bonus = 0.1  # weight for comment count
+    for idx, article_id in enumerate(article_ids):
+        if article_id in article_features['article_id'].values:
+            comment_count = article_features.loc[article_features['article_id'] == article_id, 'comment_count'].values[0]
+            scores[idx] += comment_count * comment_bonus
+
     if exclude_seen:
         seen = _get_seen_article_ids(user_id)
         article_idx_map = model["article_idx"]
@@ -79,7 +89,8 @@ def _fallback_popular(top_k: int, user_id: int | None = None) -> list[int]:
     qs = (
         Article.objects
         .filter(status="published")
-        .order_by("-view_count", "-created_at")
+        .annotate(comment_count=models.Count('comments'))
+        .order_by("-view_count", "-comment_count", "-created_at")
     )
     if user_id:
         from apps.interactions.models import ArticleView
@@ -103,11 +114,13 @@ def _recommendations_for_new_user(user_id: int, top_k: int, exclude_seen: bool) 
             # Pas de préférences définies, fallback vers articles populaires
             return _fallback_popular(top_k, user_id=user_id if exclude_seen else None)
         
-        # Articles dans les catégories préférées, triés par popularité
+        # Articles dans les catégories préférées, triés par popularité et commentaires
         queryset = Article.objects.filter(
             status='published',
             categories__in=preferred_categories
-        ).order_by('-view_count', '-created_at').distinct()
+        ).annotate(
+            comment_count=models.Count('comments')
+        ).order_by('-view_count', '-comment_count', '-created_at').distinct()
         
         if exclude_seen:
             seen = _get_seen_article_ids(user_id)

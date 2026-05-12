@@ -13,8 +13,12 @@ class Notification(TimeStampedModel):
         REPLY = 'reply', 'Reply to Comment'
         LIKE = 'like', 'Like'
         FOLLOW = 'follow', 'New Follower'
+        ARTICLE_SUBMITTED = 'article_submitted', 'Review Requested'
         ARTICLE_APPROVED = 'article_approved', 'Article Approved'
         ARTICLE_REJECTED = 'article_rejected', 'Article Rejected'
+        ARTICLE_SAVED = 'article_saved', 'Article Saved'
+        MODERATOR_CREATED = 'moderator_created', 'Moderator Created'
+        MODERATOR_ACTION = 'moderator_action', 'Moderator Action'
 
     recipient = models.ForeignKey(
         "users.User",

@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Profil de {{ user.full_name }} | Smart Blog AI{% endblock %}
+{% block title %}Profil de {{ user.full_name }} | Blogora{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                {% if profile.avatar %}
-                <img src="{{ profile.avatar.url }}" class="rounded-circle mb-3" width="150" height="150" alt="Avatar">
+                {% if user.avatar %}
+                <img src="{{ user.avatar.url }}" class="rounded-circle mb-3" width="150" height="150" alt="Avatar">
                 {% else %}
                 <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3"
                     style="width: 150px; height: 150px; font-size: 3rem;">

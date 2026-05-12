@@ -48,6 +48,11 @@ class User(AbstractUser):
             return self.avatar.url
         return None
 
+    @property
+    def has_published_articles(self):
+        """Check if user has any published articles."""
+        return self.articles.filter(status='published').exists()
+
 
 class UserProfile(TimeStampedModel):
     """
@@ -61,6 +66,34 @@ class UserProfile(TimeStampedModel):
     twitter = models.CharField(max_length=50, blank=True)
     github = models.CharField(max_length=50, blank=True)
     location = models.CharField(max_length=100, blank=True)
+    email_notifications = models.BooleanField(
+        default=True,
+        help_text="Receive email notifications for important updates"
+    )
+    push_notifications = models.BooleanField(
+        default=True,
+        help_text="Receive in-app push notifications"
+    )
+    notify_article_comments = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone comments on my article"
+    )
+    notify_comment_replies = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone replies to my comment"
+    )
+    notify_article_likes = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone likes my article"
+    )
+    notify_article_saves = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone saves my article"
+    )
+    notify_comment_likes = models.BooleanField(
+        default=True,
+        help_text="Notify me when someone likes my comment"
+    )
     auto_publish = models.BooleanField(
         default=False,
         help_text="If True, author's articles are published automatically without review"
@@ -186,7 +219,7 @@ class Moderator(TimeStampedModel):
         return f"Moderator: {self.user.username}"
     
     def save(self, *args, **kwargs):
-        """Ensure moderator user has moderator role."""
+        """Ensure moderator user has moderator role and auto_publish on for admins."""
         if self.user.role != User.Role.MODERATOR:
             self.user.role = User.Role.MODERATOR
             self.user.save()

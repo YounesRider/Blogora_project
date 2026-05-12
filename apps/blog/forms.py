@@ -1,6 +1,8 @@
 from django import forms
+from django.db import models
 from .models import Article
 from apps.taxonomy.models import Category, Tag
+from apps.users.models import User
 
 
 class ArticleCreateForm(forms.ModelForm):
@@ -40,13 +42,53 @@ class ArticleCreateForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         # Filter available categories and tags
         self.fields['categories'].queryset = Category.objects.all()
         self.fields['tags'].queryset = Tag.objects.all()
-        
-        # Limit status choices for regular users
-        if 'status' in self.fields:
+
+        # Allow admins to assign articles to an author
+        if self.user and (self.user.is_staff or self.user.role == 'admin'):
+            self.fields['author'] = forms.ModelChoiceField(
+                queryset=User.objects.filter(
+                    models.Q(role=User.Role.AUTHOR) | models.Q(role=User.Role.ADMIN)
+                ),
+                required=False,
+                label='Author',
+                widget=forms.Select(attrs={'class': 'form-select'})
+            )
+            self.fields['author'].initial = self.user
+
+        # Allow privileged users to control auto-publishing
+        can_auto_publish = bool(
+            self.user and (
+                self.user.is_staff or
+                self.user.role == 'admin' or
+                (hasattr(self.user, 'profile') and self.user.profile.auto_publish)
+            )
+        )
+        if can_auto_publish:
+            self.fields['auto_publish'] = forms.BooleanField(
+                required=False,
+                initial=True,
+                label='Auto-publish',
+                help_text='Publish this article immediately if the author has auto-publish privileges.',
+                widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+            )
+
+        # Limit status choices based on user role or auto-publish privilege
+        if self.user and (
+            self.user.is_staff or
+            self.user.role == 'admin' or
+            (hasattr(self.user, 'profile') and self.user.profile.auto_publish)
+        ):
+            self.fields['status'].choices = [
+                ('draft', 'Draft'),
+                ('pending_review', 'Submit for Review'),
+                ('published', 'Publish')
+            ]
+        else:
             self.fields['status'].choices = [
                 ('draft', 'Draft'),
                 ('pending_review', 'Submit for Review')
@@ -116,12 +158,38 @@ class ArticleUpdateForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.fields['categories'].queryset = Category.objects.all()
         self.fields['tags'].queryset = Tag.objects.all()
-        
-        # Limit status choices for regular users
-        if 'status' in self.fields:
+
+        can_auto_publish = bool(
+            self.user and (
+                self.user.is_staff or
+                self.user.role == 'admin' or
+                (hasattr(self.user, 'profile') and self.user.profile.auto_publish)
+            )
+        )
+        if can_auto_publish:
+            self.fields['auto_publish'] = forms.BooleanField(
+                required=False,
+                initial=getattr(self.instance, 'auto_publish', True),
+                label='Auto-publish',
+                help_text='Publish this article immediately if the author has auto-publish privileges.',
+                widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+            )
+
+        if self.user and (
+            self.user.is_staff or
+            self.user.role == 'admin' or
+            (hasattr(self.user, 'profile') and self.user.profile.auto_publish)
+        ):
+            self.fields['status'].choices = [
+                ('draft', 'Draft'),
+                ('pending_review', 'Submit for Review'),
+                ('published', 'Publish')
+            ]
+        else:
             self.fields['status'].choices = [
                 ('draft', 'Draft'),
                 ('pending_review', 'Submit for Review')

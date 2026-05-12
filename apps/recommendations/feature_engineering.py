@@ -31,13 +31,16 @@ def build_user_article_matrix() -> pd.DataFrame:
     Returns:
         DataFrame avec colonnes [user_id, article_id, score]
     """
+    from django.contrib.contenttypes.models import ContentType
+    from apps.blog.models import Article
     from apps.interactions.models import Like, SavedArticle, ArticleView
 
+    article_content_type = ContentType.objects.get_for_model(Article)
     records = []
 
-    # Collecte des likes (interaction la plus forte)
-    for like in Like.objects.select_related("user", "article"):
-        records.append({"user_id": like.user_id, "article_id": like.article_id, "value": 3})
+    # Collecte des likes d'articles uniquement (ignorer les likes de commentaires)
+    for like in Like.objects.filter(content_type=article_content_type).select_related("user"):
+        records.append({"user_id": like.user_id, "article_id": like.object_id, "value": 3})
 
     # Collecte des sauvegardes (intérêt moyen)
     for save in SavedArticle.objects.select_related("user", "article"):
@@ -109,7 +112,7 @@ def compute_article_features() -> pd.DataFrame:
     rows = []
     for art in articles:
         # Calcul de la fraîcheur (décroissance exponentielle sur 30 jours)
-        age_days = (now - (art.published_at or art.created_at)).days
+        age_days = (now - art.created_at).days
         freshness = np.exp(-age_days / 30)  # décroit exponentiellement sur 30j
 
         popularity = (
@@ -118,12 +121,18 @@ def compute_article_features() -> pd.DataFrame:
             + art.view_count * 0.1
         )
 
+        comment_count = art.comments.count()
+        category_count = art.categories.count()
+        tag_count = art.tags.count()
+
         rows.append({
             "article_id": art.id,
-            "category_id": art.category_id,
             "freshness": freshness,
             "popularity": popularity,
-            "read_time": art.read_time,
+            "comment_count": comment_count,
+            "read_time": art.reading_time,
+            "category_count": category_count,
+            "tag_count": tag_count,
         })
 
     return pd.DataFrame(rows)
@@ -134,10 +143,12 @@ def compute_user_category_affinity(user_id: int) -> dict:
     Retourne un dict {category_id: affinity_score} pour un utilisateur.
     Affinity = somme pondérée des interactions pour les articles de cette catégorie.
     """
-    from apps.interactions.models import ArticleView, Like, SavedArticle
-    from apps.comments.models import Comment
+    from django.contrib.contenttypes.models import ContentType
     from apps.blog.models import Article
+    from apps.comments.models import Comment
+    from apps.interactions.models import ArticleView, Like, SavedArticle
 
+    article_content_type = ContentType.objects.get_for_model(Article)
     affinity: dict[int, float] = {}
     
     # Pondérations pour différents types d'interactions
@@ -150,34 +161,37 @@ def compute_user_category_affinity(user_id: int) -> dict:
     }
     
     # Vues avec durée de lecture
-    viewed = ArticleView.objects.filter(user_id=user_id).select_related("article__category")
+    viewed = ArticleView.objects.filter(user_id=user_id).select_related("article").prefetch_related("article__categories")
     for v in viewed:
-        cat = v.article.category_id
-        if cat:
+        for cat in v.article.categories.all():
             base_score = weights['view'] + (v.reading_duration * weights['reading_time'])
-            affinity[cat] = affinity.get(cat, 0) + base_score
+            affinity[cat.id] = affinity.get(cat.id, 0) + base_score
     
     # Likes
-    liked = Like.objects.filter(user_id=user_id).select_related("article__category")
+    liked = Like.objects.filter(user_id=user_id, content_type=article_content_type).select_related("user")
+    liked_article_ids = list(liked.values_list("object_id", flat=True))
+    liked_articles = {
+        article.id: article
+        for article in Article.objects.filter(id__in=liked_article_ids).prefetch_related("categories")
+    }
     for like in liked:
-        cat = like.article.category_id
-        if cat:
-            affinity[cat] = affinity.get(cat, 0) + weights['like']
+        article = liked_articles.get(like.object_id)
+        if article is None:
+            continue
+        for cat in article.categories.all():
+            affinity[cat.id] = affinity.get(cat.id, 0) + weights['like']
     
     # Sauvegardes
-    saved = SavedArticle.objects.filter(user_id=user_id).select_related("article__category")
+    saved = SavedArticle.objects.filter(user_id=user_id).select_related("article").prefetch_related("article__categories")
     for save in saved:
-        cat = save.article.category_id
-        if cat:
-            affinity[cat] = affinity.get(cat, 0) + weights['save']
+        for cat in save.article.categories.all():
+            affinity[cat.id] = affinity.get(cat.id, 0) + weights['save']
     
     # Commentaires (très fort indicateur d'engagement)
-    commented = Comment.objects.filter(author_id=user_id).select_related("article__category")
+    commented = Comment.objects.filter(author_id=user_id).select_related("article").prefetch_related("article__categories")
     for comment in commented:
-        cat = comment.article.category_id
-        if cat:
-            # Bonus pour les réponses (engagement plus profond)
+        for cat in comment.article.categories.all():
             comment_weight = weights['comment'] * (1.5 if comment.parent else 1.0)
-            affinity[cat] = affinity.get(cat, 0) + comment_weight
+            affinity[cat.id] = affinity.get(cat.id, 0) + comment_weight
     
     return affinity
